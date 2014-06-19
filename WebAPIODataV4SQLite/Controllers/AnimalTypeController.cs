@@ -53,6 +53,25 @@ namespace WebAPIODataV4SQLite.Controllers
             return Created(animalType);
         }
 
+        [HttpPost]
+        [ODataRoute("AnimalType({key})/EventData")]
+        [EnableQuery(PageSize = 20)]
+        public async Task<IHttpActionResult> CreateEventDataItemForAnimalType([FromODataUri] int key, [FromBody]EventData eventData)
+        {
+            if (eventData != null && !ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var animalType = _sqliteContext.AnimalTypeEntities.Single(t => t.Id == key);            
+            _sqliteContext.EventDataEntities.Add(eventData);
+            animalType.EventDataValues.Add(eventData);
+
+            await _sqliteContext.SaveChangesAsync();
+
+            return Created(eventData);
+        }
+
         [HttpPut]
         [ODataRoute("AnimalType")]
         public async Task<IHttpActionResult> Put([FromODataUri] int key, AnimalType animalType)
@@ -72,6 +91,9 @@ namespace WebAPIODataV4SQLite.Controllers
 
             return Updated(animalType);
         }
+
+       
+
 
         [HttpPut]
         [ODataRoute("AnimalType")]
