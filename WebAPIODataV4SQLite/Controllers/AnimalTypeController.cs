@@ -30,6 +30,14 @@ namespace WebAPIODataV4SQLite.Controllers
             return Ok(_sqliteContext.AnimalTypeEntities.Find(key));
         }
 
+        [HttpGet]
+        [ODataRoute("AnimalType({key})/EventData")]
+        [EnableQuery(PageSize = 20)]      
+        public IHttpActionResult GetEventData([FromODataUri] int key)
+        {
+            return Ok(_sqliteContext.AnimalTypeEntities.Find(key).EventDataValues);
+        }
+
         [HttpPost]
         [ODataRoute("AnimalType")]
         public async Task<IHttpActionResult> CreateEventData(AnimalType animalType)
