@@ -14,6 +14,10 @@ namespace WebAPIODataV4SQLite.DomainModel
         public DbSet<EventData> EventDataEntities { get; set; }
         public DbSet<AnimalType> AnimalTypeEntities { get; set; }
 
+        public DbSet<PlayerStats> PlayerStatsEntities { get; set; }
+        public DbSet<Player> PlayerEntities { get; set; }
+        
+
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
             // Database does not pluralize table names

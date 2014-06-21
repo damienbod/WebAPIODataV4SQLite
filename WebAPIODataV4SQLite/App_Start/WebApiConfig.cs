@@ -36,6 +36,9 @@ namespace WebAPIODataV4SQLite
             builder.EntitySet<AnimalType>("AnimalType");
             builder.EntitySet<EventData>("EventData");
 
+            builder.EntitySet<Player>("Player");
+            var playerStats = builder.EntityType<PlayerStats>();
+
             return builder.GetEdmModel();
         }
 

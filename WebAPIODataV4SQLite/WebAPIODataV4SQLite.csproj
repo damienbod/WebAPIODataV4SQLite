@@ -209,8 +209,11 @@
     <Compile Include="Controllers\EventDataController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Controllers\AnimalTypeController.cs" />
+    <Compile Include="Controllers\PlayerController.cs" />
     <Compile Include="DomainModel\AnimalType.cs" />
     <Compile Include="DomainModel\EventData.cs" />
+    <Compile Include="DomainModel\Player.cs" />
+    <Compile Include="DomainModel\PlayerStats.cs" />
     <Compile Include="DomainModel\SqliteContext.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
