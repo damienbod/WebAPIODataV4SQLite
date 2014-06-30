@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http;
 using System.Web.Http;
 using System.Web.OData;
+using System.Web.OData.Query;
 using System.Web.OData.Routing;
 using WebAPIODataV4SQLite.DomainModel;
 
@@ -27,11 +28,19 @@ namespace WebAPIODataV4SQLite.Controllers
         }
 
         [EnableQuery(PageSize = 20)]
-        [ODataRoute("SkillLevels/Levels")]
-        public IHttpActionResult AllSkillLevels()
+        [ODataRoute("SkillLevels/Levels({key})")]
+        public IHttpActionResult GetPlayerStats([FromODataUri] int key)
         {
-            return Ok(GetFixedSkillLevels().Levels);
+            return Ok(GetFixedSkillLevels().Levels.FirstOrDefault(t => t.Level == key));
         }
+
+        //[EnableQuery(PageSize = 20, AllowedQueryOptions = AllowedQueryOptions.All)]
+        //[ODataRoute("Default.PlayerStats({SkillLevel})")]
+        //[HttpGet]
+        //public IHttpActionResult PlayerStats([FromODataUri] int skillLevel)
+        //{
+        //    return Ok(_sqliteContext.PlayerStatsEntities.Where(t => t.SkillLevel == skillLevel));
+        //}
 
         private SkillLevels GetFixedSkillLevels()
         {

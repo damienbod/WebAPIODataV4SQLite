@@ -41,7 +41,11 @@ namespace WebAPIODataV4SQLite
 
             SingletonConfiguration<SkillLevels> skillLevels = builder.Singleton<SkillLevels>("SkillLevels");
             var skillLevel = builder.EntityType<SkillLevel>();
-            
+
+
+            FunctionConfiguration myFirstFunction = skillLevels.EntityType.Collection.Function("PlayerStats");
+            myFirstFunction.ReturnsCollectionFromEntitySet<PlayerStats>("PlayerStats");
+            myFirstFunction.Parameter<int>("SkillLevel");
 
             return builder.GetEdmModel();
         }
