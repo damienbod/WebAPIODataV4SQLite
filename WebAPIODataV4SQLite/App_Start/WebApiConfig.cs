@@ -37,10 +37,10 @@ namespace WebAPIODataV4SQLite
             builder.EntitySet<EventData>("EventData");
 
             builder.EntitySet<Player>("Player");
-            var playerStats = builder.EntityType<PlayerStats>();
+            builder.EntityType<PlayerStats>();
 
             SingletonConfiguration<SkillLevels> skillLevels = builder.Singleton<SkillLevels>("SkillLevels");
-            var skillLevel = builder.EntityType<SkillLevel>();
+            builder.EntityType<SkillLevel>();
       
             return builder.GetEdmModel();
         }
