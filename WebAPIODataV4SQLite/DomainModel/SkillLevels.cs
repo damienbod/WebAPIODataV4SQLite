@@ -19,5 +19,8 @@ namespace WebAPIODataV4SQLite.DomainModel
         public int Level { get; set; }
 
         public string Description { get; set; }
+
+        [Contained]
+        public virtual PlayerStats PlayerStats { get; set; }
     }
 }

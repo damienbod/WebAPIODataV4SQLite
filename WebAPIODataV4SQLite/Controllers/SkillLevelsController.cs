@@ -33,14 +33,14 @@ namespace WebAPIODataV4SQLite.Controllers
         {
             return Ok(GetFixedSkillLevels().Levels.FirstOrDefault(t => t.Level == key));
         }
-
-        //[EnableQuery(PageSize = 20, AllowedQueryOptions = AllowedQueryOptions.All)]
-        //[ODataRoute("Default.PlayerStats({SkillLevel})")]
-        //[HttpGet]
-        //public IHttpActionResult PlayerStats([FromODataUri] int skillLevel)
-        //{
-        //    return Ok(_sqliteContext.PlayerStatsEntities.Where(t => t.SkillLevel == skillLevel));
-        //}
+        
+        [EnableQuery(PageSize = 20, AllowedQueryOptions = AllowedQueryOptions.All)]
+        [HttpGet]
+        [ODataRoute("SkillLevels/Levels({key})/PlayerStats")]
+        public IHttpActionResult GetPlayserStats([FromODataUri] int key)
+        {
+            return Ok(_sqliteContext.PlayerStatsEntities.Where(t => t.SkillLevel == key));
+        }
 
         private SkillLevels GetFixedSkillLevels()
         {
