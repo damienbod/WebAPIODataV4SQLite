@@ -1,0 +1,5 @@
+C:\git\damienbod\WebAPIODataV4SQLite\WebAPIODataV4.Client\bin\Debug\WebAPIODataV4.Client.exe.config
+C:\git\damienbod\WebAPIODataV4SQLite\WebAPIODataV4.Client\bin\Debug\WebAPIODataV4.Client.exe
+C:\git\damienbod\WebAPIODataV4SQLite\WebAPIODataV4.Client\bin\Debug\WebAPIODataV4.Client.pdb
+C:\git\damienbod\WebAPIODataV4SQLite\WebAPIODataV4.Client\obj\Debug\WebAPIODataV4.Client.exe
+C:\git\damienbod\WebAPIODataV4SQLite\WebAPIODataV4.Client\obj\Debug\WebAPIODataV4.Client.pdb

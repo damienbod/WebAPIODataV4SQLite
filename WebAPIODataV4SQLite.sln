@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.30501.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebAPIODataV4SQLite", "WebAPIODataV4SQLite\WebAPIODataV4SQLite.csproj", "{61D71A1D-A4D7-4E86-8872-9EC9056A7524}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebAPIODataV4.Client", "WebAPIODataV4.Client\WebAPIODataV4.Client.csproj", "{A42DF137-B559-4DF4-9476-ABD3683B1023}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{61D71A1D-A4D7-4E86-8872-9EC9056A7524}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{61D71A1D-A4D7-4E86-8872-9EC9056A7524}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{61D71A1D-A4D7-4E86-8872-9EC9056A7524}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A42DF137-B559-4DF4-9476-ABD3683B1023}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A42DF137-B559-4DF4-9476-ABD3683B1023}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A42DF137-B559-4DF4-9476-ABD3683B1023}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A42DF137-B559-4DF4-9476-ABD3683B1023}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,6 +1,7 @@
 ﻿using System.Linq;
 using System.Web.Http;
 using System.Web.Http.Filters;
+using System.Web.OData.Batch;
 using System.Web.OData.Builder;
 using System.Web.OData.Extensions;
 using Microsoft.OData.Edm;
@@ -26,6 +27,7 @@ namespace WebAPIODataV4SQLite
             );
 
             config.MapODataServiceRoute("odata", "odata", model: GetModel());
+            config.MapODataServiceRoute("odatabatching", "odatabatching", GetModel(), new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer));
             return config;
         }
 
