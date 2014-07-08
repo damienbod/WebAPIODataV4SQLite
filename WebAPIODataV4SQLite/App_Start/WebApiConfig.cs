@@ -34,7 +34,7 @@ namespace WebAPIODataV4SQLite
         public static IEdmModel GetModel()
         {
             ODataModelBuilder builder = new ODataConventionModelBuilder();
-
+            builder.ContainerName = "DamienbodContext";
             builder.EntitySet<AnimalType>("AnimalType");
             builder.EntitySet<EventData>("EventData");
 
