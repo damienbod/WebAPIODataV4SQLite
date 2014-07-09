@@ -25,7 +25,7 @@ namespace WebAPIODataV4.Client
                 AnimalTypeId = animalsItems.First().Key,
                 Factor = 56,
                 FixChange = 13.0,
-                StringTestId = "batchtestdatafromodataclient",
+                StringTestId = "testdatafromodataclient",
                 AnimalType = animalsItems.First()
             };
 
