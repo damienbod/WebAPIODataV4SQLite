@@ -1,6 +1,6 @@
 ﻿<#
 /*
-OData Client T4 Template ver. 1.0.0
+OData Client T4 Template ver. 2.0.0
 Copyright (c) Microsoft Corporation
 All rights reserved. 
 
@@ -11,7 +11,7 @@ THIS CODE IS PROVIDED ON AN  *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF 
 See the Apache Version 2.0 License for specific language governing permissions and limitations under the License.
 */
 #>
-<#@ template debug="true" hostSpecific="true" visibility="internal" #> 
+<#@ template debug="true" hostSpecific="true" visibility="internal" #>
 <#@ output extension=".cs" #>
 <#@ Assembly Name="System.Core.dll" #>
 <#@ Assembly Name="System.Xml.dll" #>
@@ -33,7 +33,9 @@ See the Apache Version 2.0 License for specific language governing permissions a
 <#@ Import Namespace="Microsoft.OData.Edm" #>
 <#@ Import Namespace="Microsoft.OData.Edm.Annotations" #>
 <#@ Import Namespace="Microsoft.OData.Edm.Expressions" #>
+<#@ Import Namespace="Microsoft.OData.Edm.Library" #>
 <#@ Import Namespace="Microsoft.OData.Edm.Values" #>
+<#@ Import Namespace="Microsoft.OData.Edm.Vocabularis" #>
 <#@ Import Namespace="System.Text"#>
 <#@ Import Namespace="System.Net"#>
 <#
@@ -43,17 +45,31 @@ See the Apache Version 2.0 License for specific language governing permissions a
 		context = new CodeGenerationContext(this.Edmx, this.NamespacePrefix)
         {
             UseDataServiceCollection = this.UseDataServiceCollection,
-            TargetLanguage = this.TargetLanguage
+            TargetLanguage = this.TargetLanguage,
+			EnableNamingAlias = this.EnableNamingAlias,
+			IgnoreUnexpectedElementsAndAttributes = this.IgnoreUnexpectedElementsAndAttributes
         };
     }
 	else
     {
-        this.ApplyParametersFromHost();
+        this.ApplyParametersFromCommandLine();
+		if (string.IsNullOrEmpty(metadataDocumentUri))
+        {
+			this.ApplyParametersFromConfigurationClass();
+        }
+
 		context = new CodeGenerationContext(new Uri(this.MetadataDocumentUri, UriKind.Absolute), this.NamespacePrefix)
         {
             UseDataServiceCollection = this.UseDataServiceCollection,
-            TargetLanguage = this.TargetLanguage
+            TargetLanguage = this.TargetLanguage,
+			EnableNamingAlias = this.EnableNamingAlias,
+			IgnoreUnexpectedElementsAndAttributes = this.IgnoreUnexpectedElementsAndAttributes
         };
+    }
+
+	if(this.GetReferencedModelReaderFunc != null)
+    {
+        context.GetReferencedModelReaderFunc = this.GetReferencedModelReaderFunc;
     }
 
     ODataClientTemplate template;
@@ -70,8 +86,12 @@ See the Apache Version 2.0 License for specific language governing permissions a
             throw new NotSupportedException(string.Format("Code gen for the target language '{0}' is not supported.", this.TargetLanguage.ToString()));
     }
 
-#><#=template.TransformText()#><#+
-
+#><#=template.TransformText()#><#
+	foreach (string warning in context.Warnings)
+    {
+		this.Warning(warning);
+    }
+#><#+
 /// <summary>
 /// The string for the edmx content.
 /// </summary>
@@ -108,10 +128,10 @@ public string MetadataDocumentUri
 		if (uri.Scheme == "http" || uri.Scheme == "https")
         {
 			value = uri.Scheme + "://" + uri.Authority + uri.AbsolutePath;
-			value += uri.AbsolutePath.EndsWith("/") ? string.Empty : "/";
-			if (!value.EndsWith("$metadata/"))
+			value = value.TrimEnd('/');
+			if (!value.EndsWith("$metadata"))
             {
-				value += "$metadata/";
+				value += "/$metadata";
             }
         }
 
@@ -120,6 +140,15 @@ public string MetadataDocumentUri
 }
 
 private string metadataDocumentUri;
+
+/// <summary>
+/// The Func to get referenced model's XmlReader. Must have value when the this.Edmx xml or this.metadataDocumentUri's model has referneced model.
+/// </summary>
+public Func<Uri,XmlReader> GetReferencedModelReaderFunc
+{
+    get;
+    set;
+}
 
 /// <summary>
 /// The NamespacePrefix is used as the only namespace for types in the same namespace as the default container,
@@ -164,6 +193,24 @@ public LanguageOption TargetLanguage
 {
     get;
     set;
+}
+
+/// <summary>
+/// true to use Upper camel case for all class and property names, false otherwise.
+/// </summary>
+public bool EnableNamingAlias
+{
+    get;
+    set;
+}
+
+/// <summary>
+/// true to ignore unknown elements or attributes in metadata, false otherwise.
+/// </summary>
+public bool IgnoreUnexpectedElementsAndAttributes
+{
+	get;
+	set;
 }
 
 /// <summary>
@@ -219,56 +266,56 @@ public void ValidateAndSetTargetLanguageFromString(string stringValue)
 }
 
 /// <summary>
-/// Reads the parameter values from the host and applies them.
+/// Set the EnableNamingAlias property with the given value.
 /// </summary>
-internal void ApplyParametersFromHost()
+/// <param name="stringValue">The value to set.</param>
+public void ValidateAndSetEnableNamingAliasFromString(string stringValue)
 {
-    if (this.Host == null)
+    bool boolValue;
+    if (!bool.TryParse(stringValue, out boolValue))
     {
-        return;
+        // ********************************************************************************************************
+        // To fix this error, if the current text transformation is run by the TextTemplatingFileGenerator
+        // custom tool inside Visual Studio, update the .odata.config file in the project with a valid parameter
+        // value then hit Ctrl-S to save the .tt file to refresh the code generation.
+        // ********************************************************************************************************
+        throw new ArgumentException(string.Format("The value \"{0}\" cannot be assigned to the EnableNamingAlias parameter because it is not a valid boolean value.", stringValue));
     }
 
-    string configFile = this.Host.TemplateFile.Replace("tt", "odata.config");
-    if (File.Exists(configFile))
-    {
-        XElement config = XElement.Parse(File.ReadAllText(configFile));
-        this.ApplyParametersFromConfigFile(config);
-    }
-
-    // Parameter values from the commandline overrides the values from the config file.
-    this.ApplyParametersFromCommandLine();
+    this.EnableNamingAlias = boolValue;
 }
 
 /// <summary>
-/// Reads the parameter values from the config file and applies them.
+/// Set the IgnoreUnexpectedElementsAndAttributes property with the given value.
 /// </summary>
-internal void ApplyParametersFromConfigFile(XElement config)
+/// <param name="stringValue">The value to set.</param>
+public void ValidateAndSetIgnoreUnexpectedElementsAndAttributesFromString(string stringValue)
 {
-    foreach (XElement parameter in config.Descendants("Parameter"))
+    bool boolValue;
+    if (!bool.TryParse(stringValue, out boolValue))
     {
-        XAttribute nameAttribute = parameter.Attribute("Name");
-        XAttribute valueAttribute = parameter.Attribute("Value");
-        string parameterName = nameAttribute == null ? null : nameAttribute.Value;
-        string parameterValue = valueAttribute == null ? null : valueAttribute.Value;
-        switch (parameterName)
-        {
-            case "MetadataDocumentUri":
-                this.MetadataDocumentUri = parameterValue;
-                break;
-
-            case "NamespacePrefix":
-                this.NamespacePrefix = parameterValue;
-                break;
-
-            case "UseDataServiceCollection":
-                this.ValidateAndSetUseDataServiceCollectionFromString(parameterValue);
-                break;
-
-            case "TargetLanguage":
-                this.ValidateAndSetTargetLanguageFromString(parameterValue);
-                break;
-        }
+        // ********************************************************************************************************
+        // To fix this error, if the current text transformation is run by the TextTemplatingFileGenerator
+        // custom tool inside Visual Studio, update the .odata.config file in the project with a valid parameter
+        // value then hit Ctrl-S to save the .tt file to refresh the code generation.
+        // ********************************************************************************************************
+        throw new ArgumentException(string.Format("The value \"{0}\" cannot be assigned to the IgnoreUnexpectedElementsAndAttributes parameter because it is not a valid boolean value.", stringValue));
     }
+
+    this.IgnoreUnexpectedElementsAndAttributes = boolValue;
+}
+
+/// <summary>
+/// Reads the parameter values from the Configuration class and applies them.
+/// </summary>
+private void ApplyParametersFromConfigurationClass()
+{
+	this.MetadataDocumentUri = Configuration.MetadataDocumentUri;
+	this.NamespacePrefix = Configuration.NamespacePrefix;
+	this.UseDataServiceCollection = Configuration.UseDataServiceCollection;
+	this.ValidateAndSetTargetLanguageFromString(Configuration.TargetLanguage);
+	this.EnableNamingAlias = Configuration.EnableNamingAlias;
+	this.IgnoreUnexpectedElementsAndAttributes = Configuration.IgnoreUnexpectedElementsAndAttributes;
 }
 
 /// <summary>
@@ -276,6 +323,11 @@ internal void ApplyParametersFromConfigFile(XElement config)
 /// </summary>
 private void ApplyParametersFromCommandLine()
 {
+    if (this.Host == null)
+    {
+        return;
+    }
+
     string metadataDocumentUri = this.Host.ResolveParameterValue("notempty", "notempty", "MetadataDocumentUri");
     if (!string.IsNullOrEmpty(metadataDocumentUri))
     {
@@ -299,6 +351,18 @@ private void ApplyParametersFromCommandLine()
     {
         this.ValidateAndSetTargetLanguageFromString(targetLanguage);
     }
+
+	string enableNamingAlias = this.Host.ResolveParameterValue("notempty", "notempty", "EnableNamingAlias");
+    if (!string.IsNullOrEmpty(enableNamingAlias))
+    {
+        this.ValidateAndSetEnableNamingAliasFromString(enableNamingAlias);
+	}
+
+	string ignoreUnexpectedElementsAndAttributes = this.Host.ResolveParameterValue("notempty", "notempty", "IgnoreUnexpectedElementsAndAttributes");
+    if (!string.IsNullOrEmpty(ignoreUnexpectedElementsAndAttributes))
+    {
+        this.ValidateAndSetIgnoreUnexpectedElementsAndAttributesFromString(ignoreUnexpectedElementsAndAttributes);
+	}
 }
 
 /// <summary>
@@ -342,6 +406,11 @@ public class CodeGenerationContext
     /// The array of namespaces in the current edm model.
     /// </summary>
     private string[] namespacesInModel;
+
+	/// <summary>
+    /// The array of warnings occured when parsing edm model.
+    /// </summary>
+	private string[] warnings;
 
     /// <summary>
     /// true if the model contains any structural type with inheritance, false otherwise.
@@ -393,30 +462,99 @@ public class CodeGenerationContext
     {
         get { return this.edmx; }
     }
-
+	
     /// <summary>
     /// The EdmModel to generate code for.
     /// </summary>
     public IEdmModel EdmModel
     {
-        get
+		get
         {
             if (this.edmModel == null)
             {
                 Debug.Assert(this.edmx != null, "this.edmx != null");
 
                 IEnumerable<Microsoft.OData.Edm.Validation.EdmError> errors;
-                if (!EdmxReader.TryParse(this.edmx.CreateReader(ReaderOptions.None), out this.edmModel, out errors))
+                EdmxReaderSettings edmxReaderSettings = new EdmxReaderSettings()
+                {
+                    GetReferencedModelReaderFunc = this.GetReferencedModelReaderFuncWrapper,
+                    IgnoreUnexpectedAttributesAndElements = this.IgnoreUnexpectedElementsAndAttributes
+                };
+                if (!EdmxReader.TryParse(this.edmx.CreateReader(ReaderOptions.None), Enumerable.Empty<IEdmModel>(), edmxReaderSettings, out this.edmModel, out errors))
                 {
                     Debug.Assert(errors != null, "errors != null");
                     throw new InvalidOperationException(errors.FirstOrDefault().ErrorMessage);
                 }
+				else if (this.IgnoreUnexpectedElementsAndAttributes)
+				{
+					if (errors != null && errors.Any())
+					{
+						this.warnings = errors.Select(e => e.ErrorMessage).ToArray();
+					}
+				}
             }
 
             return this.edmModel;
         }
     }
-		
+
+    /// <summary>
+    /// The func for user code to overwrite and provide referenced model's XmlReader.
+    /// </summary>
+    public Func<Uri,XmlReader> GetReferencedModelReaderFunc
+    {
+        get { return getReferencedModelReaderFunc; }
+        set { this.getReferencedModelReaderFunc = value; }
+    }
+
+    /// <summary>
+    /// Basic setting for XmlReader.
+    /// </summary>
+    private static readonly XmlReaderSettings settings = new XmlReaderSettings() { IgnoreWhitespace = true };
+
+    /// <summary>
+    /// The func for user code to overwrite and provide referenced model's XmlReader.
+    /// </summary>
+    private Func<Uri, XmlReader> getReferencedModelReaderFunc = uri => XmlReader.Create(GetEdmxStreamFromUri(uri), settings);
+
+    /// <summary>
+    /// The Wrapper func for user code to overwrite and provide referenced model's stream.
+    /// </summary>
+    public Func<Uri, XmlReader> GetReferencedModelReaderFuncWrapper
+    {
+        get
+        {
+            return (uri) =>
+            {
+                using (XmlReader reader = GetReferencedModelReaderFunc(uri))
+                {
+                    if (reader == null)
+                    {
+                        return null;
+                    }
+
+                    XElement element = XElement.Load(reader);
+                    if (this.ReferencesMap == null)
+                    {
+                        this.ReferencesMap = new Dictionary<Uri, XElement>();
+                    }
+
+                    this.ReferencesMap.Add(uri, element);
+                    return element.CreateReader(ReaderOptions.None);
+                }
+            };
+        }
+    }
+
+    /// <summary>
+    /// Dictionary that stores uri and referenced xml mapping.
+    /// </summary>
+    public Dictionary<Uri, XElement> ReferencesMap
+    {
+        get;
+        set;
+    }
+
     /// <summary>
     /// The array of namespaces in the current edm model.
     /// </summary>
@@ -427,11 +565,19 @@ public class CodeGenerationContext
             if (this.namespacesInModel == null)
             {
                 Debug.Assert(this.EdmModel != null, "this.EdmModel != null");
-                this.namespacesInModel = this.EdmModel.SchemaElements.Select(e => e.Namespace).Distinct().ToArray();
-            }
+				this.namespacesInModel = GetElementsFromModelTree(this.EdmModel, (m) => m.SchemaElements.Select(e => e.Namespace)).Distinct().ToArray();
+		    }
 
             return this.namespacesInModel;
         }
+    }
+
+	/// <summary>
+    /// The array of warnings occured when parsing edm model.
+    /// </summary>
+	public string[] Warnings
+    {
+		get { return this.warnings ?? (this.warnings = new string[] {}); }
     }
 
     /// <summary>
@@ -444,7 +590,7 @@ public class CodeGenerationContext
 			if (!this.modelHasInheritance.HasValue)
 			{
 				Debug.Assert(this.EdmModel != null, "this.EdmModel != null");
-				this.modelHasInheritance = this.EdmModel.SchemaElements.OfType<IEdmStructuredType>().Any(t => t.BaseType != null);
+				this.modelHasInheritance = this.EdmModel.SchemaElementsAcrossModels().OfType<IEdmStructuredType>().Any(t => t.BaseType != null);
 			}
 
 			return this.modelHasInheritance.Value;
@@ -456,7 +602,7 @@ public class CodeGenerationContext
     /// </summary>
 	public bool NeedResolveNameFromType
 	{
-		get	{ return this.ModelHasInheritance || this.NamespaceMap.Count > 0; }
+		get	{ return this.ModelHasInheritance || this.NamespaceMap.Count > 0 || this.EnableNamingAlias; }
 	}
 
     /// <summary>
@@ -464,7 +610,7 @@ public class CodeGenerationContext
     /// </summary>
 	public bool NeedResolveTypeFromName
 	{
-        get { return this.NamespaceMap.Count > 0; }
+        get { return this.NamespaceMap.Count > 0 || this.EnableNamingAlias; }
     }
 
     /// <summary>
@@ -479,19 +625,34 @@ public class CodeGenerationContext
             {
                 if (!string.IsNullOrEmpty(this.namespacePrefix))
                 {
-					if (this.NamespacesInModel.Count() == 1) {
+					if (this.NamespacesInModel.Count() == 1)
+					{
 						IEdmEntityContainer container = this.EdmModel.EntityContainer;
 						string containerNamespace = container == null ? null : container.Namespace;
 						this.namespaceMap = this.NamespacesInModel
 							.Distinct()
 							.ToDictionary(
 								ns => ns,
-								ns => ns == containerNamespace ? this.namespacePrefix : this.namespacePrefix + "." + ns);
+								ns => ns == containerNamespace ?
+									this.namespacePrefix :
+									this.namespacePrefix + "." + (this.EnableNamingAlias ? Customization.CustomizeNamespace(ns) : ns));
                     }
 					else
                     {
-						this.namespaceMap = this.NamespacesInModel.Distinct().ToDictionary(ns => ns, ns => this.namespacePrefix + "." + ns);
+						this.namespaceMap = this.NamespacesInModel
+							.Distinct()
+							.ToDictionary(
+								ns => ns,
+								ns => this.namespacePrefix + "." + (this.EnableNamingAlias ? Customization.CustomizeNamespace(ns) : ns));
                     }
+                }
+				else if (this.EnableNamingAlias)
+                {
+					this.namespaceMap = this.NamespacesInModel
+							.Distinct()
+							.ToDictionary(
+								ns => ns,
+								ns => Customization.CustomizeNamespace(ns));
                 }
                 else
                 {
@@ -516,6 +677,24 @@ public class CodeGenerationContext
     /// Specifies which specific .Net Framework language the generated code will target.
     /// </summary>
     public LanguageOption TargetLanguage
+    {
+        get;
+        set;
+    }
+
+	/// <summary>
+    /// true to use Upper camel case for all class and property names, false otherwise.
+    /// </summary>
+    public bool EnableNamingAlias
+    {
+        get;
+        set;
+    }
+
+	/// <summary>
+    /// true to ignore unknown elements or attributes in metadata, false otherwise.
+    /// </summary>
+    public bool IgnoreUnexpectedElementsAndAttributes
     {
         get;
         set;
@@ -571,7 +750,7 @@ public class CodeGenerationContext
     {
         Debug.Assert(ns != null, "ns != null");
         Debug.Assert(this.EdmModel != null, "this.EdmModel != null");
-        return this.EdmModel.SchemaElements.Where(e => e.Namespace == ns);
+        return GetElementsFromModelTree(this.EdmModel, m => m.SchemaElements.Where(e => e.Namespace == ns));
     }
 
     /// <summary>
@@ -581,14 +760,14 @@ public class CodeGenerationContext
 	/// <param name="schemaElementFixedName">The fixed name of this schemaElement.</param>
 	/// <param name="template">The current code generate template.</param>
     /// <returns>The namespace qualified name for the given <paramref name="schemaElement"/> with the namespace prefix applied if this.NamespacePrefix is specified.</returns>
-    public string GetPrefixedFullName(IEdmSchemaElement schemaElement, string schemaElementFixedName, ODataClientTemplate template)
+    public string GetPrefixedFullName(IEdmSchemaElement schemaElement, string schemaElementFixedName, ODataClientTemplate template, bool needGlobalPrefix = true)
     {
 		if (schemaElement == null)
         {
 			return null;
         }
 
-		return this.GetPrefixedNamespace(schemaElement.Namespace, template, true, true) + "." + schemaElementFixedName;
+		return this.GetPrefixedNamespace(schemaElement.Namespace, template, true, needGlobalPrefix) + "." + schemaElementFixedName;
     }
 
 	/// <summary>
@@ -615,12 +794,20 @@ public class CodeGenerationContext
 		if (needFix)
         {
 			string[] segments = prefixedNamespace.Split('.');
-			foreach (string seg in segments)
+			prefixedNamespace = string.Empty;
+			int n = segments.Length;
+			for (int i = 0; i < n; ++i)
 			{
-				if (template.LanguageKeywords.Contains(seg))
+				if (template.LanguageKeywords.Contains(segments[i]))
 				{
-					prefixedNamespace = prefixedNamespace.Replace(seg, string.Format(template.FixPattern, seg));
+					prefixedNamespace += string.Format(template.FixPattern, segments[i]);
 				}
+				else
+                {
+					prefixedNamespace += segments[i];
+                }
+
+				prefixedNamespace += (i == n - 1 ? string.Empty : ".");
 			}
         }
 
@@ -638,24 +825,76 @@ public class CodeGenerationContext
     /// <param name="metadataUri">The Uri to the metadata document. The supported scheme are File, http and https.</param>
     private static string GetEdmxStringFromMetadataPath(Uri metadataUri)
     {
+        string content = null;
+        using (StreamReader streamReader = new StreamReader(GetEdmxStreamFromUri(metadataUri)))
+        {
+            content = streamReader.ReadToEnd();
+        }
+
+        return content;
+    }
+
+    /// <summary>
+    /// Get the metadata stream from a file path or a http/https path.
+    /// </summary>
+    /// <param name="metadataUri">The Uri to the stream. The supported scheme are File, http and https.</param>
+    private static Stream GetEdmxStreamFromUri(Uri metadataUri)
+    {
         Debug.Assert(metadataUri != null, "metadataUri != null");
-        Stream metadataStream;
+        Stream metadataStream = null;
         if (metadataUri.Scheme == "file")
         {
             metadataStream = new FileStream(Uri.UnescapeDataString(metadataUri.AbsolutePath), FileMode.Open, FileAccess.Read);
         }
         else if (metadataUri.Scheme == "http" || metadataUri.Scheme == "https")
         {
-            HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(metadataUri);
-            WebResponse webResponse = webRequest.GetResponse();
-            metadataStream = webResponse.GetResponseStream();
+            try
+            {
+                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(metadataUri);
+                WebResponse webResponse = webRequest.GetResponse();
+                metadataStream = webResponse.GetResponseStream();
+            }
+            catch (WebException e)
+            {
+                HttpWebResponse webResponse = e.Response as HttpWebResponse;
+                if (webResponse != null && webResponse.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    throw new WebException("Failed to access the metadata document. The OData service requires authentication for accessing it. Please download the metadata, store it into a local file, and set the value of “MetadataDocumentUri” in the .odata.config file to the file path. After that, run custom tool again to generate the OData Client code.");
+                }
+                else
+                {
+                    throw e;
+                }
+            }
         }
         else
         {
             throw new ArgumentException("Only file, http, https schemes are supported for paths to metadata source locations.");
         }
 
-        return (new StreamReader(metadataStream)).ReadToEnd();
+        return metadataStream;
+    }
+
+    private static IEnumerable<T> GetElementsFromModelTree<T>(IEdmModel mainModel, Func<IEdmModel, IEnumerable<T>> getElementFromOneModelFunc)
+    {
+        List<T> ret = new List<T>();
+		if(mainModel is EdmCoreModel || mainModel.FindDeclaredValueTerm(CoreVocabularyConstants.CoreOptimisticConcurrencyControl) != null)
+		{
+			return ret;
+		}
+
+        ret.AddRange(getElementFromOneModelFunc(mainModel));
+        foreach (var tmp in mainModel.ReferencedModels)
+        {
+            if (tmp is EdmCoreModel || tmp.FindDeclaredValueTerm(CoreVocabularyConstants.CoreOptimisticConcurrencyControl) != null || tmp.FindDeclaredValueTerm(CapabilitiesVocabularyConstants.CapabilitiesChangeTracking) != null)
+            {
+                continue;
+            }
+
+            ret.AddRange(getElementFromOneModelFunc(tmp));
+        }
+
+        return ret;
     }
 }
 
@@ -664,10 +903,12 @@ public class CodeGenerationContext
 /// </summary>
 public abstract class ODataClientTemplate : TemplateBase
 {
+	protected readonly string singleSuffix = "Single";
+
     /// <summary>
     /// The code generation context.
     /// </summary>
-    private readonly CodeGenerationContext context;
+    protected readonly CodeGenerationContext context;
 
     /// <summary>
     /// Creates an instance of the ODataClientTemplate.
@@ -682,11 +923,16 @@ public abstract class ODataClientTemplate : TemplateBase
 	internal abstract string GlobalPrefix { get; }
 	internal abstract string SystemTypeTypeName { get; }
 	internal abstract string AbstractModifier { get; }
+	internal abstract string DataServiceActionQueryTypeName { get; }
+	internal abstract string DataServiceActionQuerySingleOfTStructureTemplate { get; }
+	internal abstract string DataServiceActionQueryOfTStructureTemplate { get; }
 	internal abstract string NotifyPropertyChangedModifier { get; }
 	internal abstract string ClassInheritMarker { get; }
 	internal abstract string ParameterSeparator { get; }
 	internal abstract string SystemNullableStructureTemplate { get; }
 	internal abstract string DataServiceCollectionStructureTemplate { get; }
+	internal abstract string DataServiceQueryStructureTemplate { get; }
+	internal abstract string DataServiceQuerySingleStructureTemplate { get; }
 	internal abstract string ObservableCollectionStructureTemplate { get; }
 	internal abstract string ObjectModelCollectionStructureTemplate { get; }
 	internal abstract string DataServiceCollectionConstructorParameters { get; }
@@ -728,12 +974,19 @@ public abstract class ODataClientTemplate : TemplateBase
 	internal abstract HashSet<string> LanguageKeywords { get; }
 	internal abstract string FixPattern { get; }
 	internal abstract string EnumUnderlyingTypeMarker { get; }
+	internal abstract string ConstantExpressionConstructorWithType { get; }
+	internal abstract string TypeofFormatter { get; }
+	internal abstract string UriOperationParameterConstructor { get; }
+	internal abstract string BodyOperationParameterConstructor { get; }
+	internal abstract string BaseEntityType { get; }
+	internal abstract string OverloadsModifier { get; }
+	internal abstract string ODataVersion { get; }
 	#endregion Get Language specific keyword names.
 
     #region Language specific write methods.
     internal abstract void WriteFileHeader();
     internal abstract void WriteNamespaceStart(string fullNamespace);
-    internal abstract void WriteClassStartForEntityContainer(string containerName, string fixedContainerName);
+    internal abstract void WriteClassStartForEntityContainer(string originalContainerName, string containerName, string fixedContainerName);
     internal abstract void WriteMethodStartForEntityContainerConstructor(string containerName, string fixedContainerName);
 	internal abstract void WriteKeyAsSegmentUrlConvention();
     internal abstract void WriteInitializeResolveName();
@@ -745,34 +998,48 @@ public abstract class ODataClientTemplate : TemplateBase
     internal abstract void WriteMethodStartForResolveNameFromType(string containerName, string fullNamespace);
     internal abstract void WriteResolveType(string fullNamespace, string languageDependentNamespace);
     internal abstract void WriteMethodEndForResolveNameFromType(bool modelHasInheritance);
-    internal abstract void WriteContextEntitySetProperty(string entitySetName, string entitySetFixedName, string entitySetElementTypeName);
-    internal abstract void WriteContextSingletonProperty(string singletonName, string singletonFixedName, string singletonElementTypeName);
-    internal abstract void WriteContextAddToEntitySetMethod(string entitySetName, string typeName, string parameterName);
+    internal abstract void WriteContextEntitySetProperty(string entitySetName, string entitySetFixedName, string originalEntitySetName, string entitySetElementTypeName, bool inContext = true);
+    internal abstract void WriteContextSingletonProperty(string singletonName, string singletonFixedName, string originalSingletonName, string singletonElementTypeName, bool inContext = true);
+    internal abstract void WriteContextAddToEntitySetMethod(string entitySetName, string originalEntitySetName, string typeName, string parameterName);
     internal abstract void WriteGeneratedEdmModel(string escapedEdmxString);
     internal abstract void WriteClassEndForEntityContainer();
     internal abstract void WriteSummaryCommentForStructuredType(string typeName);
-    internal abstract void WriteKeyPropertiesCommentAndAttribute(IEnumerable<string> keyProperties);
+    internal abstract void WriteKeyPropertiesCommentAndAttribute(IEnumerable<string> keyProperties, string keyString);
     internal abstract void WriteEntitySetAttribute(string entitySetName);
     internal abstract void WriteEntityHasStreamAttribute();
-    internal abstract void WriteClassStartForStructuredType(string abstractModifier, string typeName, string baseTypeName);
+    internal abstract void WriteClassStartForStructuredType(string abstractModifier, string typeName, string originalTypeName, string baseTypeName);
     internal abstract void WriteSummaryCommentForStaticCreateMethod(string typeName);
-    internal abstract void WriteParameterCommentForStateicCreateMethod(string parameterName, string propertyName);
+    internal abstract void WriteParameterCommentForStaticCreateMethod(string parameterName, string propertyName);
     internal abstract void WriteDeclarationStartForStaticCreateMethod(string typeName,string fixedTypeName );
     internal abstract void WriteParameterForStaticCreateMethod(string parameterTypeName, string parameterName, string parameterSeparater);
     internal abstract void WriteDeclarationEndForStaticCreateMethod(string typeName, string instanceName);
     internal abstract void WriteParameterNullCheckForStaticCreateMethod(string parameterName);
     internal abstract void WritePropertyValueAssignmentForStaticCreateMethod(string instanceName, string propertyName, string parameterName);
     internal abstract void WriteMethodEndForStaticCreateMethod(string instanceName);
-    internal abstract void WritePropertyForStructuredType(string propertyType, string propertyName, string fixedPropertyName, string propertyInitializationValue, bool writeOnPropertyChanged);
+    internal abstract void WritePropertyForStructuredType(string propertyType, string originalPropertyName, string propertyName, string fixedPropertyName, string propertyInitializationValue, bool writeOnPropertyChanged);
     internal abstract void WriteINotifyPropertyChangedImplementation();
     internal abstract void WriteClassEndForStructuredType();
     internal abstract void WriteNamespaceEnd();
 	internal abstract void WriteEnumFlags();
 	internal abstract void WriteSummaryCommentForEnumType(string enumName);
-	internal abstract void WriteEnumDeclaration(string enumName, string underlyingType);
-	internal abstract void WriteMemberForEnumType(string member, bool last);
+	internal abstract void WriteEnumDeclaration(string enumName, string originalEnumName, string underlyingType);
+	internal abstract void WriteMemberForEnumType(string member, string originalMemberName, bool last);
 	internal abstract void WriteEnumEnd();
 	internal abstract void WritePropertyRootNamespace(string containerName, string fullNamespace);
+	internal abstract void WriteFunctionImportReturnCollectionResult(string functionName, string originalFunctionName, string returnTypeName, string parameters, string parameterValues, bool isComposable);
+	internal abstract void WriteFunctionImportReturnSingleResult(string functionName, string originalFunctionName, string returnTypeName, string parameters, string parameterValues, bool isComposable);
+	internal abstract void WriteBoundFunctionInEntityTypeReturnCollectionResult(bool hideBaseMethod, string functionName, string originalFunctionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable);
+    internal abstract void WriteBoundFunctionInEntityTypeReturnSingleResult(bool hideBaseMethod, string functionName, string originalFunctionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable);
+    internal abstract void WriteActionImport(string actionName, string originalActionName, string returnTypeName, string parameters, string parameterValues);
+	internal abstract void WriteBoundActionInEntityType(bool hideBaseMethod, string actionName, string originalActionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues);
+	internal abstract void WriteConstructorForSingleType(string singleTypeName);
+	internal abstract void WriteExtensionMethodsStart();
+	internal abstract void WriteExtensionMethodsEnd();
+	internal abstract void WriteByKeyMethods(string entityTypeName, string returnTypeName);
+	internal abstract void WriteCastToMethods(string baseTypeName, string derivedTypeName, string derivedTypeFullName, string returnTypeName);
+	internal abstract void WriteBoundFunctionReturnSingleResultAsExtension(string functionName, string originalFunctionName, string boundTypeName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable);
+	internal abstract void WriteBoundFunctionReturnCollectionResultAsExtension(string functionName, string originalFunctionName, string boundTypeName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable);
+	internal abstract void WriteBoundActionAsExtension(string actionName, string originalActionName, string boundSourceType, string returnTypeName, string parameters, string fullNamespace, string parameterValues);
     #endregion Language specific write methods.
 
 	internal HashSet<EdmPrimitiveTypeKind> ClrReferenceTypes { get { 
@@ -820,13 +1087,36 @@ public abstract class ODataClientTemplate : TemplateBase
 			IEdmEntityContainer container = schemaElements.OfType<IEdmEntityContainer>().Single();
 			this.WriteEntityContainer(container, fullNamespace);
         }
+		
+		Dictionary<IEdmStructuredType, List<IEdmOperation>> boundOperationsMap = new Dictionary<IEdmStructuredType, List<IEdmOperation>>();
+		foreach (IEdmOperation operation in schemaElements.OfType<IEdmOperation>())
+        {
+			if (operation.IsBound)
+            {
+				IEdmType edmType = operation.Parameters.First().Type.Definition;
+				IEdmStructuredType edmStructuredType = edmType as IEdmStructuredType;
+                if (edmStructuredType != null)
+                {
+                    List<IEdmOperation> operationList;
+                    if (!boundOperationsMap.TryGetValue(edmStructuredType, out operationList))
+                    {
+                        operationList = new List<IEdmOperation>();
+                    }
 
+                    operationList.Add(operation);
+                    boundOperationsMap[edmStructuredType] = operationList;
+                }
+            }
+        }
+
+		Dictionary<IEdmStructuredType, List<IEdmStructuredType>> entityBaseTypeMap = new Dictionary<IEdmStructuredType, List<IEdmStructuredType>>();
+		bool hasBoundOperations = this.HasBoundOperations(schemaElements.OfType<IEdmOperation>());
         foreach(IEdmSchemaType type in schemaElements.OfType<IEdmSchemaType>())
         {
             IEdmComplexType complexType = type as IEdmComplexType;
             if (complexType != null)
             {
-                this.WriteComplexType(complexType);
+                this.WriteComplexType(complexType, boundOperationsMap);
             }
             else
             {
@@ -837,49 +1127,238 @@ public abstract class ODataClientTemplate : TemplateBase
                 }
 				else
                 {
-					this.WriteEntityType((IEdmEntityType)type);
+					IEdmEntityType entityType = type as IEdmEntityType;
+					this.WriteEntityType(entityType, boundOperationsMap, hasBoundOperations);
+					if (entityType.BaseType != null)
+                    {
+						List<IEdmStructuredType> derivedTypes;
+						if (!entityBaseTypeMap.TryGetValue(entityType.BaseType, out derivedTypes))
+                        {
+							entityBaseTypeMap[entityType.BaseType] = new List<IEdmStructuredType>();
+                        }
+
+						entityBaseTypeMap[entityType.BaseType].Add(entityType);
+                    }
 				}
 			}
         }
 
+		this.WriteExtensionMethodsStart();
+		foreach (IEdmEntityType type in schemaElements.OfType<IEdmEntityType>())
+        {
+			string entityTypeName = type.Name;
+			entityTypeName = context.EnableNamingAlias ? Customization.CustomizeNaming(entityTypeName) : entityTypeName;
+			string entityTypeFullName = context.GetPrefixedFullName(type, GetFixedName(entityTypeName), this);
+			string returnTypeName = context.GetPrefixedFullName(type, GetFixedName(entityTypeName + this.singleSuffix), this);
+			this.WriteByKeyMethods(entityTypeFullName, returnTypeName);
+
+			IEdmEntityType current = (IEdmEntityType)type.BaseType;
+			while (current != null)
+			{
+				string baseTypeName = current.Name;
+				baseTypeName = context.EnableNamingAlias ? Customization.CustomizeNaming(baseTypeName) : baseTypeName;
+				baseTypeName = context.GetPrefixedFullName(current, GetFixedName(baseTypeName), this);
+				this.WriteCastToMethods(baseTypeName, entityTypeName, entityTypeFullName, returnTypeName);
+				current = (IEdmEntityType)current.BaseType;
+			}
+        }
+
+		HashSet<KeyValuePair<string, List<IEdmTypeReference>>> boundFunctions = new HashSet<KeyValuePair<string, List<IEdmTypeReference>>>();
+		foreach (IEdmFunction function in schemaElements.OfType<IEdmFunction>())
+        {
+			if (function.IsBound)
+            {				
+				IEdmTypeReference edmTypeReference = function.Parameters.First().Type;
+				string functionName = this.context.EnableNamingAlias ? Customization.CustomizeNaming(function.Name) : function.Name;
+				string parameterString, parameterExpressionString, parameterTypes, parameterValues;
+				this.GetParameterStrings(function.IsBound, false, function.Parameters.ToArray(), out parameterString, out parameterTypes, out parameterExpressionString, out parameterValues);
+				string sourceTypeName = GetSourceOrReturnTypeName(edmTypeReference);
+				sourceTypeName = string.Format(edmTypeReference.IsCollection() ? this.DataServiceQueryStructureTemplate : this.DataServiceQuerySingleStructureTemplate, sourceTypeName);
+				string returnTypeName = GetSourceOrReturnTypeName(function.ReturnType);
+				if (function.ReturnType.IsEntity())
+				{
+					returnTypeName += this.singleSuffix;
+				}
+				else if (!function.ReturnType.IsCollection())
+				{
+					returnTypeName = string.Format(this.DataServiceQuerySingleStructureTemplate, returnTypeName);
+				}
+						
+				List<IEdmTypeReference> parameters = function.Parameters.Select(p => p.Type).ToList();
+				KeyValuePair<string, List<IEdmTypeReference>> func = new KeyValuePair<string, List<IEdmTypeReference>>(function.Name, parameters);
+				if (!boundFunctions.Contains(func))
+                {
+					boundFunctions.Add(func);
+
+					if (function.ReturnType.IsCollection())
+					{
+						this.WriteBoundFunctionReturnCollectionResultAsExtension(GetFixedName(functionName), function.Name, sourceTypeName, returnTypeName, parameterString, function.Namespace, parameterValues, function.IsComposable);
+					}
+					else
+					{
+						this.WriteBoundFunctionReturnSingleResultAsExtension(GetFixedName(functionName), function.Name, sourceTypeName, returnTypeName, parameterString, function.Namespace, parameterValues, function.IsComposable);
+					}
+                }
+
+				IEdmStructuredType structuredType;
+				if (edmTypeReference.IsCollection())
+				{
+					IEdmCollectionType collectionType = edmTypeReference.Definition as IEdmCollectionType;
+					structuredType = (IEdmStructuredType)collectionType.ElementType.Definition;
+                }
+				else
+				{
+					structuredType = (IEdmStructuredType)edmTypeReference.Definition;
+                }
+
+				List<IEdmStructuredType> derivedTypes;
+				if (entityBaseTypeMap.TryGetValue(structuredType, out derivedTypes))
+                {
+					foreach (IEdmStructuredType type in derivedTypes)
+                    {
+						IEdmTypeReference derivedTypeReference = new EdmEntityTypeReference((IEdmEntityType)type, true);
+						List<IEdmTypeReference> currentParameters = function.Parameters.Select(p => p.Type).ToList();
+						currentParameters[0] = derivedTypeReference;
+						KeyValuePair<string, List<IEdmTypeReference>> currentFunc = new KeyValuePair<string, List<IEdmTypeReference>>(function.Name, currentParameters);
+						if (!boundFunctions.Contains(currentFunc))
+						{
+							boundFunctions.Add(currentFunc);
+
+							sourceTypeName = GetSourceOrReturnTypeName(derivedTypeReference);
+							sourceTypeName = string.Format(edmTypeReference.IsCollection() ? this.DataServiceQueryStructureTemplate : this.DataServiceQuerySingleStructureTemplate, sourceTypeName);
+							if (function.ReturnType.IsCollection())
+							{
+								this.WriteBoundFunctionReturnCollectionResultAsExtension(GetFixedName(functionName), function.Name, sourceTypeName, returnTypeName, parameterString, function.Namespace, parameterValues, function.IsComposable);
+							}
+							else
+							{
+								this.WriteBoundFunctionReturnSingleResultAsExtension(GetFixedName(functionName), function.Name, sourceTypeName, returnTypeName, parameterString, function.Namespace, parameterValues, function.IsComposable);
+							}
+                        }
+                    }
+                }
+            }
+        }
+
+		HashSet<KeyValuePair<string, List<IEdmTypeReference>>> boundActions = new HashSet<KeyValuePair<string, List<IEdmTypeReference>>>();
+		foreach (IEdmAction action in schemaElements.OfType<IEdmAction>())
+        {
+			if (action.IsBound)
+            {
+				IEdmTypeReference edmTypeReference = action.Parameters.First().Type;
+				string actionName = this.context.EnableNamingAlias ? Customization.CustomizeNaming(action.Name) : action.Name;
+                string parameterString, parameterExpressionString, parameterTypes, parameterValues;
+				this.GetParameterStrings(action.IsBound, true, action.Parameters.ToArray(), out parameterString, out parameterTypes, out parameterExpressionString, out parameterValues);
+				string sourceTypeName = GetSourceOrReturnTypeName(edmTypeReference);
+				sourceTypeName = string.Format(edmTypeReference.IsCollection() ? this.DataServiceQueryStructureTemplate : this.DataServiceQuerySingleStructureTemplate, sourceTypeName);
+				string returnTypeName;
+				if (action.ReturnType != null)
+				{
+					returnTypeName = GetSourceOrReturnTypeName(action.ReturnType);
+					if (action.ReturnType.IsCollection())
+					{
+						returnTypeName = string.Format(this.DataServiceActionQueryOfTStructureTemplate, returnTypeName);
+					}
+					else
+					{
+						returnTypeName = string.Format(this.DataServiceActionQuerySingleOfTStructureTemplate, returnTypeName);
+					}
+				}
+				else
+				{
+					returnTypeName = this.DataServiceActionQueryTypeName;
+				}
+				
+				List<IEdmTypeReference> parameters = action.Parameters.Select(p => p.Type).ToList();
+				KeyValuePair<string, List<IEdmTypeReference>> ac = new KeyValuePair<string, List<IEdmTypeReference>>(action.Name, parameters);
+				if (!boundFunctions.Contains(ac))
+                {
+					boundFunctions.Add(ac);
+					this.WriteBoundActionAsExtension(GetFixedName(actionName), action.Name, sourceTypeName, returnTypeName, parameterString, action.Namespace, parameterValues);
+                }
+
+				IEdmStructuredType structuredType;
+				if (edmTypeReference.IsCollection())
+				{
+					IEdmCollectionType collectionType = edmTypeReference.Definition as IEdmCollectionType;
+					structuredType = (IEdmStructuredType)collectionType.ElementType.Definition;
+                }
+				else
+				{
+					structuredType = (IEdmStructuredType)edmTypeReference.Definition;
+                }
+
+				List<IEdmStructuredType> derivedTypes;
+				if (entityBaseTypeMap.TryGetValue(structuredType, out derivedTypes))
+                {
+					foreach (IEdmStructuredType type in derivedTypes)
+                    {
+						IEdmTypeReference derivedTypeReference = new EdmEntityTypeReference((IEdmEntityType)type, true);
+						List<IEdmTypeReference> currentParameters = action.Parameters.Select(p => p.Type).ToList();
+						currentParameters[0] = derivedTypeReference;
+						KeyValuePair<string, List<IEdmTypeReference>> currentAc = new KeyValuePair<string, List<IEdmTypeReference>>(action.Name, parameters);
+						if (!boundFunctions.Contains(currentAc))
+						{
+							boundFunctions.Add(currentAc);
+
+							sourceTypeName = GetSourceOrReturnTypeName(derivedTypeReference);
+							sourceTypeName = string.Format(edmTypeReference.IsCollection() ? this.DataServiceQueryStructureTemplate : this.DataServiceQuerySingleStructureTemplate, sourceTypeName);
+							this.WriteBoundActionAsExtension(GetFixedName(actionName), action.Name, sourceTypeName, returnTypeName, parameterString, action.Namespace, parameterValues);
+                        }
+					}
+                }
+            }
+        }
+
+		this.WriteExtensionMethodsEnd();
+
         this.WriteNamespaceEnd();
     }
-
-	internal string GetElementTypeName(IEdmEntityType elementType, IEdmEntityContainer container)
+	
+	internal bool HasBoundOperations(IEnumerable<IEdmOperation> operations)
     {
-		string elementTypeName;
-
-		if (elementType.Namespace == container.Namespace)
+		foreach (IEdmOperation opeartion in operations)
         {
-			elementTypeName = elementType.Name;
-		}
-		else
-		{
-			elementTypeName = this.context.GetPrefixedFullName(elementType, GetFixedName(elementType.Name), this);
-		}
+			if (opeartion.IsBound)
+            {
+				return true;
+            }
+        }
 
-		return elementTypeName;
+		return false;
 	}
 
     internal void WriteEntityContainer(IEdmEntityContainer container, string fullNamespace)
     {
-        this.WriteClassStartForEntityContainer(container.Name, GetFixedName(container.Name));
+		string camelCaseContainerName = container.Name;
+		if (this.context.EnableNamingAlias)
+        {
+			camelCaseContainerName = Customization.CustomizeNaming(camelCaseContainerName);
+		}
+
+        this.WriteClassStartForEntityContainer(container.Name, camelCaseContainerName, GetFixedName(camelCaseContainerName));
         this.WriteEntityContainerConstructor(container);
 
 		if (this.context.NeedResolveNameFromType)
         {
-			this.WritePropertyRootNamespace(GetFixedName(container.Name), this.context.GetPrefixedNamespace(fullNamespace, this, false, false));
+			this.WritePropertyRootNamespace(GetFixedName(camelCaseContainerName), this.context.GetPrefixedNamespace(fullNamespace, this, false, false));
 		}
 
         this.WriteResolveTypeFromName();
-        this.WriteResolveNameFromType(container.Name, fullNamespace);
+        this.WriteResolveNameFromType(camelCaseContainerName, fullNamespace);
 
         foreach (IEdmEntitySet entitySet in container.EntitySets())
         {
             IEdmEntityType entitySetElementType = entitySet.EntityType();
 			string entitySetElementTypeName = GetElementTypeName(entitySetElementType, container);
 
-            this.WriteContextEntitySetProperty(entitySet.Name, GetFixedName(entitySet.Name), GetFixedName(entitySetElementTypeName));
+			string camelCaseEntitySetName = entitySet.Name;
+			if (this.context.EnableNamingAlias)
+			{
+				camelCaseEntitySetName = Customization.CustomizeNaming(camelCaseEntitySetName);
+			}
+
+            this.WriteContextEntitySetProperty(camelCaseEntitySetName, GetFixedName(camelCaseEntitySetName), entitySet.Name, GetFixedName(entitySetElementTypeName));
             List<IEdmNavigationSource> edmNavigationSourceList = null;
             if (!this.context.ElementTypeToNavigationSourceMap.TryGetValue(entitySet.EntityType(), out edmNavigationSourceList))
             {
@@ -899,14 +1378,26 @@ public abstract class ODataClientTemplate : TemplateBase
 			UniqueIdentifierService uniqueIdentifierService = new UniqueIdentifierService(/*IsLanguageCaseSensitive*/true);
             string parameterName = GetFixedName(uniqueIdentifierService.GetUniqueParameterName(entitySetElementType.Name));
 
-            this.WriteContextAddToEntitySetMethod(entitySet.Name, GetFixedName(entitySetElementTypeName), parameterName);
+			string camelCaseEntitySetName = entitySet.Name;
+			if (this.context.EnableNamingAlias)
+			{
+				camelCaseEntitySetName = Customization.CustomizeNaming(camelCaseEntitySetName);
+        }
+
+            this.WriteContextAddToEntitySetMethod(camelCaseEntitySetName, entitySet.Name, GetFixedName(entitySetElementTypeName), parameterName);
         }
 
 		foreach (IEdmSingleton singleton in container.Singletons())
 		{
             IEdmEntityType singletonElementType = singleton.EntityType();
             string singletonElementTypeName = GetElementTypeName(singletonElementType, container);
-            this.WriteContextSingletonProperty(singleton.Name, GetFixedName(singleton.Name), GetFixedName(singletonElementTypeName));
+			string camelCaseSingletonName = singleton.Name;
+			if (this.context.EnableNamingAlias)
+			{
+				camelCaseSingletonName = Customization.CustomizeNaming(camelCaseSingletonName);
+			}
+
+            this.WriteContextSingletonProperty(camelCaseSingletonName, GetFixedName(camelCaseSingletonName), singleton.Name, singletonElementTypeName + "Single");
 
 			List<IEdmNavigationSource> edmNavigationSourceList = null;
             if (this.context.ElementTypeToNavigationSourceMap.TryGetValue(singleton.EntityType(), out edmNavigationSourceList))
@@ -916,12 +1407,89 @@ public abstract class ODataClientTemplate : TemplateBase
 		}
 
         this.WriteGeneratedEdmModel(Utils.SerializeToString(this.context.Edmx).Replace("\"", "\"\""));
-        this.WriteClassEndForEntityContainer();
+        
+		bool hasOperationImport = container.OperationImports().OfType<IEdmOperationImport>().Any();
+		foreach (IEdmFunctionImport functionImport in container.OperationImports().OfType<IEdmFunctionImport>())
+		{
+			string parameterString, parameterTypes, parameterExpressionString, parameterValues;
+            
+			this.GetParameterStrings(false, false, functionImport.Function.Parameters.ToArray(), out parameterString, out parameterTypes, out parameterExpressionString, out parameterValues);
+			string returnTypeName = GetSourceOrReturnTypeName(functionImport.Function.ReturnType);
+			string fixedContainerName = this.GetFixedName(functionImport.Container.Name);
+			bool isCollectionResult = functionImport.Function.ReturnType.IsCollection();
+			string functionImportName = functionImport.Name;
+			if (this.context.EnableNamingAlias)
+            {
+				functionImportName = Customization.CustomizeNaming(functionImportName);
+				fixedContainerName = Customization.CustomizeNaming(fixedContainerName);
+            }
+
+			if (functionImport.Function.ReturnType.IsCollection())
+            {
+				this.WriteFunctionImportReturnCollectionResult(this.GetFixedName(functionImportName), functionImport.Name, returnTypeName, parameterString, parameterValues, functionImport.Function.IsComposable);
+			}
+			else
+            {
+				if (functionImport.Function.ReturnType.IsEntity())
+				{
+					returnTypeName += this.singleSuffix;
+				}
+				else
+				{
+					returnTypeName = string.Format(this.DataServiceQuerySingleStructureTemplate, returnTypeName);
+				}
+		
+				this.WriteFunctionImportReturnSingleResult(this.GetFixedName(functionImportName), functionImport.Name, returnTypeName, parameterString, parameterValues, functionImport.Function.IsComposable);
+            }
+		}
+		
+		foreach (IEdmActionImport actionImport in container.OperationImports().OfType<IEdmActionImport>())
+		{
+			string parameterString, parameterTypes, parameterExpressionString, parameterValues;
+            
+			this.GetParameterStrings(false, true, actionImport.Action.Parameters.ToArray(), out parameterString, out parameterTypes, out parameterExpressionString, out parameterValues);
+			string returnTypeName = null;
+			string fixedContainerName = this.GetFixedName(actionImport.Container.Name);
+
+			if (actionImport.Action.ReturnType != null)
+			{
+				returnTypeName = GetSourceOrReturnTypeName(actionImport.Action.ReturnType);
+				if (actionImport.Action.ReturnType.IsCollection())
+                {
+					returnTypeName = string.Format(this.DataServiceActionQueryOfTStructureTemplate, returnTypeName);
+            }
+				else
+                {
+					returnTypeName = string.Format(this.DataServiceActionQuerySingleOfTStructureTemplate, returnTypeName);
+                }
+			}
+			else
+            {
+				returnTypeName = this.DataServiceActionQueryTypeName;
+            }
+
+			string actionImportName = actionImport.Name;
+			if (this.context.EnableNamingAlias)
+            {
+				actionImportName = Customization.CustomizeNaming(actionImportName);
+				fixedContainerName = Customization.CustomizeNaming(fixedContainerName);
+            }
+
+			this.WriteActionImport(this.GetFixedName(actionImportName), actionImport.Name, returnTypeName, parameterString, parameterValues);
+		}
+
+		this.WriteClassEndForEntityContainer();
     }
 
     internal void WriteEntityContainerConstructor(IEdmEntityContainer container)
     {
-        this.WriteMethodStartForEntityContainerConstructor(container.Name, GetFixedName(container.Name));
+		string camelCaseContainerName = container.Name;
+		if (this.context.EnableNamingAlias)
+        {
+			camelCaseContainerName = Customization.CustomizeNaming(camelCaseContainerName);
+        }
+		
+        this.WriteMethodStartForEntityContainerConstructor(camelCaseContainerName, GetFixedName(camelCaseContainerName));
 		
 		if (this.context.UseKeyAsSegmentUrlConvention(container))
         {
@@ -955,7 +1523,7 @@ public abstract class ODataClientTemplate : TemplateBase
 		// order, starting with the longest prefix.
 		IEnumerable<KeyValuePair<string, string>> namespaceToPrefixedNamespacePairs = this.context.NamespaceMap.OrderByDescending(p => p.Key.Length).ThenBy(p => p.Key);
         
-		string typeName = this.SystemTypeTypeName;
+		string typeName = this.SystemTypeTypeName + " ";
 		foreach(KeyValuePair<string, string> namespaceToPrefixedNamespacePair in namespaceToPrefixedNamespacePairs)
         {
             this.WriteResolveNamespace(typeName, namespaceToPrefixedNamespacePair.Key, namespaceToPrefixedNamespacePair.Value);
@@ -986,13 +1554,53 @@ public abstract class ODataClientTemplate : TemplateBase
         this.WriteMethodEndForResolveNameFromType(this.context.ModelHasInheritance);
     }
 
-    internal void WriteEntityType(IEdmEntityType entityType)
+	internal void WritePropertiesForSingleType(IEnumerable<IEdmProperty> properties)
     {
-        this.WriteSummaryCommentForStructuredType(entityType.Name);
+        foreach (IEdmProperty property in properties.Where(i => i.PropertyKind == EdmPropertyKind.Navigation))
+        {
+            string propertyType;
+			string propertyName = this.context.EnableNamingAlias ? Customization.CustomizeNaming(property.Name) : property.Name;
+            if (property.Type is Microsoft.OData.Edm.Library.EdmCollectionTypeReference)
+            {
+				propertyType = GetSourceOrReturnTypeName(property.Type);
+                WriteContextEntitySetProperty(propertyName, GetFixedName(propertyName), property.Name, propertyType, false);
+            }
+            else
+            {
+				propertyType = Utils.GetClrTypeName(property.Type, true, this, this.context, true);
+                WriteContextSingletonProperty(propertyName, GetFixedName(propertyName), property.Name, propertyType + "Single", false);
+            }
+        }
+    }
+
+    internal void WriteEntityType(IEdmEntityType entityType, Dictionary<IEdmStructuredType, List<IEdmOperation>> boundOperationsMap, bool hasOperation)
+    {
+		string entityTypeName = ((IEdmSchemaElement)entityType).Name;
+		entityTypeName = this.context.EnableNamingAlias ? Customization.CustomizeNaming(entityTypeName) : entityTypeName;
+		this.WriteSummaryCommentForStructuredType(entityTypeName + this.singleSuffix);
+		this.WriteStructurdTypeDeclaration(entityType,
+			this.ClassInheritMarker + string.Format(this.DataServiceQuerySingleStructureTemplate, GetFixedName(entityTypeName)),
+			this.singleSuffix);
+		string singleTypeName = (this.context.EnableNamingAlias ?
+			Customization.CustomizeNaming(((IEdmSchemaElement)entityType).Name) : ((IEdmSchemaElement)entityType).Name) + this.singleSuffix;
+		this.WriteConstructorForSingleType(GetFixedName(singleTypeName));
+		IEdmEntityType current = entityType;
+		while (current != null)
+        {
+			this.WritePropertiesForSingleType(current.DeclaredProperties);
+			current = (IEdmEntityType)current.BaseType;
+        }
+
+		this.WriteClassEndForStructuredType();
+
+        this.WriteSummaryCommentForStructuredType(this.context.EnableNamingAlias ? Customization.CustomizeNaming(entityType.Name) : entityType.Name);
 		
 		if (entityType.Key().Any())
 		{
-			this.WriteKeyPropertiesCommentAndAttribute(entityType.Key().Select(k => k.Name));
+			IEnumerable<string> keyProperties = entityType.Key().Select(k => k.Name);
+			this.WriteKeyPropertiesCommentAndAttribute(
+				this.context.EnableNamingAlias ? keyProperties.Select(k => Customization.CustomizeNaming(k)) : keyProperties,
+				string.Join("\", \"", keyProperties));
         }
         
 		if (this.context.UseDataServiceCollection)
@@ -1002,7 +1610,7 @@ public abstract class ODataClientTemplate : TemplateBase
             {
                 if(navigationSourceList.Count == 1)
                 {
-                    this.WriteEntitySetAttribute(GetFixedName(navigationSourceList[0].Name));
+                    this.WriteEntitySetAttribute(navigationSourceList[0].Name);
                 }
             }
         }
@@ -1012,7 +1620,7 @@ public abstract class ODataClientTemplate : TemplateBase
             this.WriteEntityHasStreamAttribute();
         }
 
-        this.WriteStructurdTypeDeclaration(entityType);
+        this.WriteStructurdTypeDeclaration(entityType, hasOperation ? this.BaseEntityType : string.Empty);
         this.WriteTypeStaticCreateMethod(entityType.Name, entityType);
         this.WritePropertiesForStructuredType(entityType.DeclaredProperties);
 
@@ -1021,13 +1629,15 @@ public abstract class ODataClientTemplate : TemplateBase
             this.WriteINotifyPropertyChangedImplementation();
         }
 
-        this.WriteClassEndForStructuredType();    
+		this.WriteBoundOperations(entityType, boundOperationsMap);
+
+        this.WriteClassEndForStructuredType();
     }
 
-    internal void WriteComplexType(IEdmComplexType complexType)
+    internal void WriteComplexType(IEdmComplexType complexType, Dictionary<IEdmStructuredType, List<IEdmOperation>> boundOperationsMap)
     {
-        this.WriteSummaryCommentForStructuredType(complexType.Name);
-        this.WriteStructurdTypeDeclaration(complexType);
+        this.WriteSummaryCommentForStructuredType(this.context.EnableNamingAlias ? Customization.CustomizeNaming(complexType.Name) : complexType.Name);
+        this.WriteStructurdTypeDeclaration(complexType, string.Empty);
         this.WriteTypeStaticCreateMethod(complexType.Name, complexType);
         this.WritePropertiesForStructuredType(complexType.DeclaredProperties);
 
@@ -1036,12 +1646,131 @@ public abstract class ODataClientTemplate : TemplateBase
             this.WriteINotifyPropertyChangedImplementation();
         }
 
+		this.WriteBoundOperations(complexType, boundOperationsMap);
+
         this.WriteClassEndForStructuredType();    
     }
+
+	internal void WriteBoundOperations(IEdmStructuredType structuredType, Dictionary<IEdmStructuredType, List<IEdmOperation>> boundOperationsMap)
+    {
+		List<IEdmOperation> operations;
+		if (boundOperationsMap.TryGetValue(structuredType, out operations))
+		{
+		    foreach (IEdmFunction function in operations.OfType<IEdmFunction>())
+		    {
+                string parameterString, parameterExpressionString, parameterTypes, parameterValues;
+				
+				bool hideBaseMethod = this.CheckMethodsInBaseClass(structuredType.BaseType, function, boundOperationsMap);
+                this.GetParameterStrings(function.IsBound, false, function.Parameters.ToArray(), out parameterString, out parameterTypes, out parameterExpressionString, out parameterValues);
+                string returnTypeName = GetSourceOrReturnTypeName(function.ReturnType);
+				string functionName = function.Name;
+				if (this.context.EnableNamingAlias)
+                {
+					functionName = Customization.CustomizeNaming(functionName);
+                }
+
+				if (function.ReturnType.IsCollection())
+                {
+					this.WriteBoundFunctionInEntityTypeReturnCollectionResult(hideBaseMethod, GetFixedName(functionName), function.Name, returnTypeName, parameterString, function.Namespace, parameterValues, function.IsComposable);
+                }
+				else
+                {
+					if (function.ReturnType.IsEntity())
+					{
+						returnTypeName += this.singleSuffix;
+					}
+					else
+					{
+						returnTypeName = string.Format(this.DataServiceQuerySingleStructureTemplate, returnTypeName);
+					}
+
+					this.WriteBoundFunctionInEntityTypeReturnSingleResult(hideBaseMethod, GetFixedName(functionName), function.Name, returnTypeName, parameterString, function.Namespace, parameterValues, function.IsComposable);
+                }
+		    }
+
+		    foreach (IEdmAction action in operations.OfType<IEdmAction>())
+		    {
+                string parameterString, parameterExpressionString, parameterTypes, parameterValues;
+
+				bool hideBaseMethod = this.CheckMethodsInBaseClass(structuredType.BaseType, action, boundOperationsMap);
+                this.GetParameterStrings(action.IsBound, true, action.Parameters.ToArray(), out parameterString, out parameterTypes, out parameterExpressionString, out parameterValues);
+                string returnTypeName;
+                if (action.ReturnType != null)
+                {
+                    returnTypeName = GetSourceOrReturnTypeName(action.ReturnType);
+					if (action.ReturnType.IsCollection())
+                    {
+						returnTypeName = string.Format(this.DataServiceActionQueryOfTStructureTemplate, returnTypeName);
+                    }
+					else
+                    {
+						returnTypeName = string.Format(this.DataServiceActionQuerySingleOfTStructureTemplate, returnTypeName);
+                    }
+				}
+				else
+                {
+					returnTypeName = this.DataServiceActionQueryTypeName;
+                }
+
+				string actionName = action.Name;
+				if (this.context.EnableNamingAlias)
+                {
+					actionName = Customization.CustomizeNaming(actionName);
+                }
+
+                this.WriteBoundActionInEntityType(hideBaseMethod, GetFixedName(actionName), action.Name, returnTypeName, parameterString, action.Namespace, parameterValues);
+		    }
+		}
+    }
 	
+	internal bool CheckMethodsInBaseClass(IEdmStructuredType structuredType, IEdmOperation operation, Dictionary<IEdmStructuredType, List<IEdmOperation>> boundOperationsMap)
+    {
+        if (structuredType != null)
+        {
+            List<IEdmOperation> operations;
+            if (boundOperationsMap.TryGetValue(structuredType, out operations))
+            {
+                foreach (IEdmOperation op in operations)
+                {
+					if (this.context.TargetLanguage == LanguageOption.VB)
+                    {
+						if (operation.Name == op.Name)
+                        {
+							return true;
+                        }
+                    }
+
+                    List<IEdmOperationParameter> targetParameter = operation.Parameters.ToList();
+                    List<IEdmOperationParameter> checkParameter = op.Parameters.ToList();
+                    if (operation.Name == op.Name && targetParameter.Count == checkParameter.Count)
+                    {
+                        bool areSame = true;
+                        for (int i = 1; i < targetParameter.Count; ++i)
+                        {
+                            if (!targetParameter[i].Equals(checkParameter[i]))
+                            {
+                                areSame = false;
+                                break;
+                            }
+                        }
+
+                        if (areSame)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return CheckMethodsInBaseClass(structuredType.BaseType, operation, boundOperationsMap);
+        }
+
+        return false;
+    }
+
 	internal void WriteEnumType(IEdmEnumType enumType)
     {
-		this.WriteSummaryCommentForEnumType(GetFixedName(enumType.Name));
+		this.WriteSummaryCommentForEnumType(this.context.EnableNamingAlias ? Customization.CustomizeNaming(enumType.Name) : enumType.Name);
 		if (enumType.IsFlags)
 		{
 			this.WriteEnumFlags();
@@ -1054,42 +1783,123 @@ public abstract class ODataClientTemplate : TemplateBase
 			underlyingType = this.EnumUnderlyingTypeMarker + underlyingType;
         }
 
-		this.WriteEnumDeclaration(GetFixedName(enumType.Name), underlyingType);
+		this.WriteEnumDeclaration(this.context.EnableNamingAlias ? GetFixedName(Customization.CustomizeNaming(enumType.Name)) : GetFixedName(enumType.Name), enumType.Name, underlyingType);
 		this.WriteMembersForEnumType(enumType.Members);
 		this.WriteEnumEnd();
     }
 
-	internal void WriteStructurdTypeDeclaration(IEdmStructuredType structuredType)
+	internal void WriteStructurdTypeDeclaration(IEdmStructuredType structuredType, string baseEntityType, string typeNameSuffix = null)
     {
-		string abstractModifier = structuredType.IsAbstract ? this.AbstractModifier : string.Empty;
-		string baseTypeName;
+		string abstractModifier = structuredType.IsAbstract && typeNameSuffix == null ? this.AbstractModifier : string.Empty;
+		string baseTypeName = baseEntityType;
 
-		if (structuredType.BaseType == null)
-		{
-			baseTypeName = this.context.UseDataServiceCollection ? this.NotifyPropertyChangedModifier : string.Empty;
-		}
-		else
-		{
-			IEdmSchemaElement baseType = (IEdmSchemaElement)structuredType.BaseType;
-			string baseTypeFixedName = GetFixedName(baseType.Name);
-			baseTypeName = ((IEdmSchemaElement)structuredType).Namespace == baseType.Namespace ? baseTypeFixedName : this.context.GetPrefixedFullName(baseType, baseTypeFixedName, this);
-			baseTypeName = this.ClassInheritMarker + baseTypeName;
-		}
+		if (typeNameSuffix == null)
+        {
+			if (structuredType.BaseType == null)
+			{
+				if (this.context.UseDataServiceCollection)
+				{
+					if (this.context.TargetLanguage == LanguageOption.CSharp)
+					{
+						baseTypeName += string.IsNullOrEmpty(baseTypeName) ? this.ClassInheritMarker : ", ";
+					}
 
-        this.WriteClassStartForStructuredType(abstractModifier, GetFixedName(((IEdmSchemaElement)structuredType).Name), baseTypeName);
+					baseTypeName += this.NotifyPropertyChangedModifier;
+				}
+			}
+			else
+			{
+				IEdmSchemaElement baseType = (IEdmSchemaElement)structuredType.BaseType;
+				string baseTypeFixedName = this.context.EnableNamingAlias ? GetFixedName(Customization.CustomizeNaming(baseType.Name)) : GetFixedName(baseType.Name);
+				baseTypeName = ((IEdmSchemaElement)structuredType).Namespace == baseType.Namespace ? baseTypeFixedName : this.context.GetPrefixedFullName(baseType, baseTypeFixedName, this);
+				baseTypeName = this.ClassInheritMarker + baseTypeName;
+			}
+        }
+
+		string structuredTypeName = this.context.EnableNamingAlias ?
+			Customization.CustomizeNaming(((IEdmSchemaElement)structuredType).Name) : ((IEdmSchemaElement)structuredType).Name;
+        this.WriteClassStartForStructuredType(abstractModifier, GetFixedName(structuredTypeName + typeNameSuffix), ((IEdmSchemaElement)structuredType).Name + typeNameSuffix, baseTypeName);
+	}
+	
+	internal string GetSourceOrReturnTypeName(IEdmTypeReference typeReference)
+    {
+		IEdmCollectionType edmCollectionType = typeReference.Definition as IEdmCollectionType;
+		bool addNullableTemplate = true;
+		if (edmCollectionType != null)
+        {
+			typeReference = edmCollectionType.ElementType;
+			addNullableTemplate = false;
+        }
+
+		return Utils.GetClrTypeName(typeReference, this.context.UseDataServiceCollection, this, this.context, addNullableTemplate);
+    }
+	
+	internal void GetParameterStrings(bool isBound, bool isAction, IEdmOperationParameter[] parameters, out string parameterString, out string parameterTypes, out string parameterExpressionString, out string parameterValues)
+    {
+		parameterString = string.Empty;
+		parameterExpressionString = string.Empty;
+		parameterTypes = string.Empty;
+		parameterValues = string.Empty;
+
+		int n = parameters.Count();
+        for (int i = isBound ? 1 : 0; i < n; ++i)
+        {
+			IEdmOperationParameter param = parameters[i];
+			if (i == (isBound ? 1 : 0))
+            {
+				if (this.context.TargetLanguage == LanguageOption.CSharp)
+                {
+					parameterExpressionString += "\r\n                        ";
+                }
+				else
+                {
+					parameterExpressionString += "\r\n                            ";
+				}
+            }
+			
+			string typeName = Utils.GetClrTypeName(param.Type, this.context.UseDataServiceCollection, this, this.context);
+            if (this.context.TargetLanguage == LanguageOption.CSharp)
+            {
+				parameterString += typeName;
+				parameterString += (" " + GetFixedName(param.Name));
+            }
+			else if (this.context.TargetLanguage == LanguageOption.VB)
+            {
+			    parameterString += GetFixedName(param.Name);
+				parameterString += (this.EnumUnderlyingTypeMarker + typeName);
+            }
+			
+			parameterString += i == n - 1 ? string.Empty : ", ";
+			parameterTypes += string.Format(this.TypeofFormatter, typeName) + ", ";
+			parameterExpressionString += this.GetParameterExpressionString(param, typeName) + ", ";
+			
+			if (i != (isBound ? 1 : 0))
+			{
+				parameterValues += ",\r\n                    ";
+			}
+			
+			parameterValues += string.Format(isAction ? this.BodyOperationParameterConstructor : this.UriOperationParameterConstructor, param.Name, GetFixedName(param.Name));
+        }
     }
 
-	internal string GetFixedName(string originalName)
+	internal string GetParameterExpressionString(IEdmOperationParameter param, string typeName)
     {
-		string fixedName = originalName;
-
-		if (this.LanguageKeywords.Contains(fixedName))
+		string clrTypeName;
+        IEdmType edmType = param.Type.Definition;
+        IEdmPrimitiveType edmPrimitiveType = edmType as IEdmPrimitiveType;
+        if (edmPrimitiveType != null)
         {
-			fixedName = string.Format(this.FixPattern, fixedName);
-		}
+            clrTypeName = Utils.GetClrTypeName(edmPrimitiveType, this);                
+            if (param.Type.IsNullable && !this.ClrReferenceTypes.Contains(edmPrimitiveType.PrimitiveKind))
+            {
+				clrTypeName += "?";
+			}
 
-		return fixedName;
-	}
+			return string.Format(this.ConstantExpressionConstructorWithType, GetFixedName(param.Name), clrTypeName);
+        }
+
+	    return string.Format(this.ConstantExpressionConstructorWithType, GetFixedName(param.Name), typeName); 
+    }
 
     internal void WriteTypeStaticCreateMethod(string typeName, IEdmStructuredType structuredType)
     {
@@ -1106,6 +1916,11 @@ public abstract class ODataClientTemplate : TemplateBase
             return;
         }
 
+		if (this.context.EnableNamingAlias)
+        {
+			typeName = Customization.CustomizeNaming(typeName);
+        }
+
         this.WriteSummaryCommentForStaticCreateMethod(typeName);
 
         UniqueIdentifierService uniqueIdentifierService = new UniqueIdentifierService(/*IsLanguageCaseSensitive*/true);
@@ -1113,7 +1928,9 @@ public abstract class ODataClientTemplate : TemplateBase
         KeyValuePair<IEdmProperty, string>[] propertyToParameterNamePairs = parameters.Select(p => new KeyValuePair<IEdmProperty, string>(p, uniqueIdentifierService.GetUniqueParameterName(p.Name))).ToArray();
         foreach (var propertyToParameterNamePair in propertyToParameterNamePairs)
         {
-            this.WriteParameterCommentForStateicCreateMethod(propertyToParameterNamePair.Value, propertyToParameterNamePair.Key.Name);
+			string propertyName = propertyToParameterNamePair.Key.Name;
+			propertyName = this.context.EnableNamingAlias ? Customization.CustomizeNaming(propertyName) : propertyName;
+            this.WriteParameterCommentForStaticCreateMethod(propertyToParameterNamePair.Value, propertyName);
         }
 
 		propertyToParameterNamePairs = propertyToParameterNamePairs.Select(p => p = new KeyValuePair<IEdmProperty, string>(p.Key, GetFixedName(p.Value))).ToArray();
@@ -1137,7 +1954,8 @@ public abstract class ODataClientTemplate : TemplateBase
                 this.WriteParameterNullCheckForStaticCreateMethod(parameterName);
             }
 
-            this.WritePropertyValueAssignmentForStaticCreateMethod(instanceName, GetFixedName(property.Name), parameterName);
+            this.WritePropertyValueAssignmentForStaticCreateMethod(instanceName,
+				this.context.EnableNamingAlias ? GetFixedName(Customization.CustomizeNaming(property.Name)) : GetFixedName(property.Name), parameterName);
         }
 
         this.WriteMethodEndForStaticCreateMethod(instanceName);
@@ -1175,7 +1993,13 @@ public abstract class ODataClientTemplate : TemplateBase
         {
             string propertyType = Utils.GetClrTypeName(property.Type, useDataServiceCollection, this, this.context);
             string propertyInitializationValue = Utils.GetPropertyInitializationValue(property, useDataServiceCollection, this, this.context);
-            this.WritePropertyForStructuredType(propertyType, property.Name, GetFixedName(property.Name), propertyInitializationValue, useDataServiceCollection);
+            string propertyName = property.Name;
+			if (this.context.EnableNamingAlias)
+            {
+				propertyName = Customization.CustomizeNaming(propertyName);
+            }
+
+			this.WritePropertyForStructuredType(propertyType, property.Name, propertyName, GetFixedName(propertyName), propertyInitializationValue, useDataServiceCollection);
         }
     }
 
@@ -1195,8 +2019,38 @@ public abstract class ODataClientTemplate : TemplateBase
                 }
             }
 
-			this.WriteMemberForEnumType(GetFixedName(member.Name) + value, idx == n - 1);
+			string memberName = this.context.EnableNamingAlias ? Customization.CustomizeNaming(member.Name) : member.Name;
+			this.WriteMemberForEnumType(GetFixedName(memberName) + value, member.Name, idx == n - 1);
         }
+    }
+
+	internal string GetFixedName(string originalName)
+    {
+		string fixedName = originalName;
+
+		if (this.LanguageKeywords.Contains(fixedName))
+        {
+			fixedName = string.Format(this.FixPattern, fixedName);
+		}
+
+		return fixedName;
+	}
+
+	internal string GetElementTypeName(IEdmEntityType elementType, IEdmEntityContainer container)
+    {
+		string elementTypeName = elementType.Name;
+
+		if (this.context.EnableNamingAlias)
+        {
+			elementTypeName = Customization.CustomizeNaming(elementTypeName);
+        }
+
+		if (elementType.Namespace != container.Namespace)
+		{
+			elementTypeName = this.context.GetPrefixedFullName(elementType, GetFixedName(elementTypeName), this);
+		}
+
+		return elementTypeName;
     }
 }
 
@@ -1626,7 +2480,7 @@ internal static class Utils
 	/// <param name="clientTemplate">ODataClientTemplate instance that call this method.</param>
 	/// <param name="context">CodeGenerationContext instance in the clientTemplate.</param>
 	/// <returns>The clr type name of the type reference.</returns>
-    internal static string GetClrTypeName(IEdmTypeReference edmTypeReference, bool useDataServiceCollection, ODataClientTemplate clientTemplate, CodeGenerationContext context)
+    internal static string GetClrTypeName(IEdmTypeReference edmTypeReference, bool useDataServiceCollection, ODataClientTemplate clientTemplate, CodeGenerationContext context, bool addNullableTemplate = true, bool needGlobalPrefix = true)
     {
         string clrTypeName;
         IEdmType edmType = edmTypeReference.Definition;
@@ -1634,7 +2488,7 @@ internal static class Utils
         if (edmPrimitiveType != null)
         {
             clrTypeName = Utils.GetClrTypeName(edmPrimitiveType, clientTemplate);                
-            if (edmTypeReference.IsNullable && !clientTemplate.ClrReferenceTypes.Contains(edmPrimitiveType.PrimitiveKind))
+            if (edmTypeReference.IsNullable && !clientTemplate.ClrReferenceTypes.Contains(edmPrimitiveType.PrimitiveKind) && addNullableTemplate)
             {
 				clrTypeName = string.Format(clientTemplate.SystemNullableStructureTemplate, clrTypeName);
             }
@@ -1644,21 +2498,28 @@ internal static class Utils
             IEdmComplexType edmComplexType = edmType as IEdmComplexType;
             if (edmComplexType != null)
             {
-                clrTypeName = context.GetPrefixedFullName(edmComplexType, clientTemplate.GetFixedName(edmComplexType.Name), clientTemplate);
+                clrTypeName = context.GetPrefixedFullName(edmComplexType,
+					context.EnableNamingAlias ? clientTemplate.GetFixedName(Customization.CustomizeNaming(edmComplexType.Name)) : clientTemplate.GetFixedName(edmComplexType.Name), clientTemplate);
             }
             else
             {
 				IEdmEnumType edmEnumType = edmType as IEdmEnumType;
 				if (edmEnumType != null)
                 {
-					clrTypeName = context.GetPrefixedFullName(edmEnumType, clientTemplate.GetFixedName(edmEnumType.Name), clientTemplate);
+					clrTypeName = context.GetPrefixedFullName(edmEnumType,
+						context.EnableNamingAlias ? clientTemplate.GetFixedName(Customization.CustomizeNaming(edmEnumType.Name)) : clientTemplate.GetFixedName(edmEnumType.Name), clientTemplate, needGlobalPrefix);
+					if (edmTypeReference.IsNullable && addNullableTemplate)
+                    {
+						clrTypeName = string.Format(clientTemplate.SystemNullableStructureTemplate, clrTypeName);
+                    }
                 }
                 else 
 				{
 					IEdmEntityType edmEntityType = edmType as IEdmEntityType;
 					if (edmEntityType != null)
 					{
-						clrTypeName = context.GetPrefixedFullName(edmEntityType, clientTemplate.GetFixedName(edmEntityType.Name), clientTemplate);
+						clrTypeName = context.GetPrefixedFullName(edmEntityType,
+							context.EnableNamingAlias ? clientTemplate.GetFixedName(Customization.CustomizeNaming(edmEntityType.Name)) : clientTemplate.GetFixedName(edmEntityType.Name), clientTemplate);
 					}
 					else
 					{
@@ -1672,7 +2533,8 @@ internal static class Utils
 						else
 						{
 							IEdmSchemaElement schemaElement = (IEdmSchemaElement)elementTypeReference.Definition;
-							clrTypeName = context.GetPrefixedFullName(schemaElement, clientTemplate.GetFixedName(schemaElement.Name), clientTemplate);
+							clrTypeName = context.GetPrefixedFullName(schemaElement,
+								context.EnableNamingAlias ? clientTemplate.GetFixedName(Customization.CustomizeNaming(schemaElement.Name)) : clientTemplate.GetFixedName(schemaElement.Name), clientTemplate);
 						}    
                 
 						string collectionTypeName = useDataServiceCollection
@@ -1686,6 +2548,7 @@ internal static class Utils
 				}
 			}
         }
+
         return clrTypeName;
     }
 
@@ -1714,7 +2577,8 @@ internal static class Utils
 
                     if (edmTypeReference.Definition.TypeKind == EdmTypeKind.Enum)
                     {
-                        string enumType = GetClrTypeName(edmTypeReference, useDataServiceCollection, clientTemplate, context);
+						string fullenumTypeName = GetClrTypeName(edmTypeReference, useDataServiceCollection, clientTemplate, context);
+                        string enumTypeName = GetClrTypeName(edmTypeReference, useDataServiceCollection, clientTemplate, context, false, false);
                         int indexFirst = defaultValue.IndexOf('\'') + 1;
                         int indexLast = defaultValue.LastIndexOf('\'');
                         if (indexFirst > 0 && indexLast > indexFirst)
@@ -1724,11 +2588,11 @@ internal static class Utils
                          
 						if (clientTemplate is ODataClientCSharpTemplate)
 						{
-                            return "(" + enumType + ")" + clientTemplate.EnumTypeName + ".Parse(" + clientTemplate.SystemTypeTypeName + ".GetType(\"" + enumType + "\"), \"" + defaultValue  + "\")";
+                            return "(" + fullenumTypeName + ")" + clientTemplate.EnumTypeName + ".Parse(" + clientTemplate.SystemTypeTypeName + ".GetType(\"" + enumTypeName + "\"), \"" + defaultValue  + "\")";
 						}
 						else
 						{
-                            return clientTemplate.EnumTypeName + ".Parse(" + clientTemplate.SystemTypeTypeName + ".GetType(\"" + enumType + "\"), \"" + defaultValue  + "\")";
+                            return clientTemplate.EnumTypeName + ".Parse(" + clientTemplate.SystemTypeTypeName + ".GetType(\"" + enumTypeName + "\"), \"" + defaultValue  + "\")";
 						}       
                     }
 
@@ -1966,13 +2830,18 @@ public sealed class ODataClientCSharpTemplate : ODataClientTemplate
     }
 
 	internal override string GlobalPrefix { get {return "global::"; } }
-	internal override string SystemTypeTypeName { get { return "global::System.Type "; } }
+	internal override string SystemTypeTypeName { get { return "global::System.Type"; } }
 	internal override string AbstractModifier { get { return " abstract"; } }
-	internal override string NotifyPropertyChangedModifier { get { return " : global::System.ComponentModel.INotifyPropertyChanged"; } }
+	internal override string DataServiceActionQueryTypeName { get { return "global::Microsoft.OData.Client.DataServiceActionQuery"; } }
+	internal override string DataServiceActionQuerySingleOfTStructureTemplate { get { return "global::Microsoft.OData.Client.DataServiceActionQuerySingle<{0}>"; } }
+	internal override string DataServiceActionQueryOfTStructureTemplate { get { return "global::Microsoft.OData.Client.DataServiceActionQuery<{0}>"; } }
+	internal override string NotifyPropertyChangedModifier { get { return "global::System.ComponentModel.INotifyPropertyChanged"; } }
 	internal override string ClassInheritMarker { get { return " : "; } }
 	internal override string ParameterSeparator { get { return ", \r\n                    "; } }
 	internal override string SystemNullableStructureTemplate { get { return "global::System.Nullable<{0}>"; } }
 	internal override string DataServiceCollectionStructureTemplate { get { return "global::Microsoft.OData.Client.DataServiceCollection<{0}>"; } }
+	internal override string DataServiceQueryStructureTemplate { get { return "global::Microsoft.OData.Client.DataServiceQuery<{0}>"; } }
+	internal override string DataServiceQuerySingleStructureTemplate { get { return "global::Microsoft.OData.Client.DataServiceQuerySingle<{0}>"; } }
 	internal override string ObservableCollectionStructureTemplate { get { return "global::System.Collections.ObjectModel.ObservableCollection<{0}>"; } }
 	internal override string ObjectModelCollectionStructureTemplate { get { return "global::System.Collections.ObjectModel.Collection<{0}>"; } }
 	internal override string DataServiceCollectionConstructorParameters { get { return "(null, global::Microsoft.OData.Client.TrackingMode.None)"; } }
@@ -2013,7 +2882,14 @@ public sealed class ODataClientCSharpTemplate : ODataClientTemplate
 	internal override string EnumTypeName { get { return "global::System.Enum"; } }
 	internal override string FixPattern { get { return "@{0}"; } }
 	internal override string EnumUnderlyingTypeMarker { get { return " : "; } }
-	internal override HashSet<string> LanguageKeywords { get { 
+	internal override string ConstantExpressionConstructorWithType { get { return "global::System.Linq.Expressions.Expression.Constant({0}, typeof({1}))"; } }
+	internal override string TypeofFormatter { get { return "typeof({0})"; } }
+	internal override string UriOperationParameterConstructor { get { return "new global::Microsoft.OData.Client.UriOperationParameter(\"{0}\", {1})"; } }
+	internal override string BodyOperationParameterConstructor { get { return "new global::Microsoft.OData.Client.BodyOperationParameter(\"{0}\", {1})"; } }
+	internal override string BaseEntityType { get { return " : global::Microsoft.OData.Client.BaseEntityType"; } }
+	internal override string OverloadsModifier { get { return "new "; } }
+	internal override string ODataVersion { get { return "global::Microsoft.OData.Core.ODataVersion.V4"; } }
+	internal override HashSet<string> LanguageKeywords { get {
 		if (CSharpKeywords == null)
         {
 			CSharpKeywords = new HashSet<string>(StringComparer.Ordinal)
@@ -2043,7 +2919,7 @@ public sealed class ODataClientCSharpTemplate : ODataClientTemplate
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generation date: <#= DateTime.Now.ToString(System.Globalization.CultureInfo.CurrentCulture) #>
+// Generation date: <#= DateTime.Now.ToString(global::System.Globalization.CultureInfo.CurrentCulture) #>
 <#+
     }
 
@@ -2055,12 +2931,20 @@ namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WriteClassStartForEntityContainer(string containerName, string fixedContainerName)
+    internal override void WriteClassStartForEntityContainer(string originalContainerName, string containerName, string fixedContainerName)
     {
 #>
     /// <summary>
     /// There are no comments for <#= containerName #> in the schema.
     /// </summary>
+<#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+    [global::Microsoft.OData.Client.OriginalNameAttribute("<#= originalContainerName #>")]
+<#+
+        }
+#>
     public partial class <#= fixedContainerName #> : global::Microsoft.OData.Client.DataServiceContext
     {
 <#+
@@ -2072,7 +2956,7 @@ namespace <#= fullNamespace #>
         /// <summary>
         /// Initialize a new <#= containerName #> object.
         /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         public <#= fixedContainerName #>(global::System.Uri serviceRoot) : 
                 base(serviceRoot, global::Microsoft.OData.Client.ODataProtocolVersion.V4)
         {
@@ -2119,7 +3003,7 @@ namespace <#= fullNamespace #>
         /// in Visual Studio is different from the one indicated in the
         /// server schema, use type-mappers to map between the two.
         /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         protected global::System.Type ResolveTypeFromName(string typeName)
         {
 <#+
@@ -2157,10 +3041,16 @@ namespace <#= fullNamespace #>
         /// in Visual Studio is different from the one indicated in the
         /// server schema, use type-mappers to map between the two.
         /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         protected string ResolveNameFromType(global::System.Type clientType)
         {
 <#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+            global::Microsoft.OData.Client.OriginalNameAttribute originalNameAttribute = (global::Microsoft.OData.Client.OriginalNameAttribute)global::System.Linq.Enumerable.SingleOrDefault(global::Microsoft.OData.Client.Utility.GetCustomAttributes(clientType, typeof(global::Microsoft.OData.Client.OriginalNameAttribute), true));
+<#+
+		}
     }
 
     internal override void WriteResolveType(string fullNamespace, string languageDependentNamespace)
@@ -2168,6 +3058,17 @@ namespace <#= fullNamespace #>
 #>
             if (clientType.Namespace.Equals("<#= languageDependentNamespace #>", global::System.StringComparison.Ordinal))
             {
+<#+
+        if (this.context.EnableNamingAlias)
+        {
+#>
+                if (originalNameAttribute != null)
+                {
+                    return string.Concat("<#= fullNamespace #>.", originalNameAttribute.OriginalName);
+                }
+<#+
+        }
+#>
                 return string.Concat("<#= fullNamespace #>.", clientType.Name);
             }
 <#+
@@ -2175,68 +3076,116 @@ namespace <#= fullNamespace #>
 
     internal override void WriteMethodEndForResolveNameFromType(bool modelHasInheritance)
     {
+		if (this.context.EnableNamingAlias && modelHasInheritance)
+        {
+#>
+            if (originalNameAttribute != null)
+            {
+                return clientType.Namespace + "." + originalNameAttribute.OriginalName;
+            }
+<#+
+        }
 #>
             return <#= modelHasInheritance ? "clientType.FullName" : "null" #>;
         }
 <#+
     }
 
-    internal override void WriteContextEntitySetProperty(string entitySetName, string entitySetFixedName, string entitySetElementTypeName)
+	internal override void WriteConstructorForSingleType(string singleTypeName)
+    {
+#>
+        /// <summary>
+        /// Initialize a new <#= singleTypeName #> object.
+        /// </summary>
+        public <#= singleTypeName #>(global::Microsoft.OData.Client.DataServiceContext context, string path)
+            : base(context, path) {}
+
+        /// <summary>
+        /// Initialize a new <#= singleTypeName #> object.
+        /// </summary>
+        public <#= singleTypeName #>(global::Microsoft.OData.Client.DataServiceContext context, string path, bool isComposable)
+            : base(context, path, isComposable) {}
+<#+
+    }
+
+    internal override void WriteContextEntitySetProperty(string entitySetName, string entitySetFixedName, string originalEntitySetName, string entitySetElementTypeName, bool inContext)
     {
 #>
         /// <summary>
         /// There are no comments for <#= entitySetName #> in the schema.
         /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         public global::Microsoft.OData.Client.DataServiceQuery<<#= entitySetElementTypeName #>> <#= entitySetFixedName #>
         {
             get
             {
+<#+
+		if (!inContext)
+        {
+#>
+                if (!this.IsComposable)
+                {
+                    throw new global::System.NotSupportedException("The previous function is not composable.");
+                }
+<#+
+        }
+#>
                 if ((this._<#= entitySetName #> == null))
                 {
-                    this._<#= entitySetName #> = base.CreateQuery<<#= entitySetElementTypeName #>>("<#= entitySetName #>");
+                    this._<#= entitySetName #> = <#= inContext ? "base" : "Context" #>.CreateQuery<<#= entitySetElementTypeName #>>(<#= inContext ? "\"" + originalEntitySetName + "\"" : "GetPath(\"" + originalEntitySetName + "\")" #>);
                 }
                 return this._<#= entitySetName #>;
             }
         }
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         private global::Microsoft.OData.Client.DataServiceQuery<<#= entitySetElementTypeName #>> _<#= entitySetName #>;
 <#+
     }
 
-	internal override void WriteContextSingletonProperty(string singletonName, string singletonFixedName, string singletonElementTypeName)
+	internal override void WriteContextSingletonProperty(string singletonName, string singletonFixedName, string originalSingletonName, string singletonElementTypeName, bool inContext)
     {
 #>
         /// <summary>
         /// There are no comments for <#= singletonName #> in the schema.
         /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
-        public global::Microsoft.OData.Client.DataServiceQuery<<#= singletonElementTypeName #>> <#= singletonFixedName #>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        public <#= singletonElementTypeName #> <#= singletonFixedName #>
         {
             get
             {
+<#+
+		if (!inContext)
+        {
+#>
+                if (!this.IsComposable)
+                {
+                    throw new global::System.NotSupportedException("The previous function is not composable.");
+                }
+<#+
+        }
+#>
                 if ((this._<#= singletonName #> == null))
                 {
-                    this._<#= singletonName #> = base.CreateSingletonQuery<<#= singletonElementTypeName #>>("<#= singletonName #>");
+                    this._<#= singletonName #> = new <#= singletonElementTypeName #>(<#= inContext ? "this" : "this.Context" #>, <#= inContext ? "\"" + originalSingletonName + "\"" : "GetPath(\"" + originalSingletonName + "\")" #>);
                 }
                 return this._<#= singletonName #>;
             }
         }
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
-        private global::Microsoft.OData.Client.DataServiceQuery<<#= singletonElementTypeName #>> _<#= singletonName #>;
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        private <#= singletonElementTypeName #> _<#= singletonName #>;
 <#+
     }
 
-    internal override void WriteContextAddToEntitySetMethod(string entitySetName, string typeName, string parameterName)
+    internal override void WriteContextAddToEntitySetMethod(string entitySetName, string originalEntitySetName, string typeName, string parameterName)
     {
 #>
         /// <summary>
         /// There are no comments for <#= entitySetName #> in the schema.
         /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         public void AddTo<#= entitySetName #>(<#= typeName #> <#= parameterName #>)
         {
-            base.AddObject("<#= entitySetName #>", <#= parameterName #>);
+            base.AddObject("<#= originalEntitySetName #>", <#= parameterName #>);
         }
 <#+
     }
@@ -2244,19 +3193,70 @@ namespace <#= fullNamespace #>
     internal override void WriteGeneratedEdmModel(string escapedEdmxString)
     {
 #>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         private abstract class GeneratedEdmModel
         {
-            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+<#+
+        if (this.context.ReferencesMap != null)
+        {
+#>
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+            private static global::System.Collections.Generic.Dictionary<string, string> ReferencesMap = new global::System.Collections.Generic.Dictionary<string, string>()
+                {
+<#+
+            foreach(var reference in this.context.ReferencesMap)
+            {
+#>
+                    {@"<#= reference.Key.OriginalString.Replace("\"", "\"\"") #>", @"<#= Utils.SerializeToString(reference.Value).Replace("\"", "\"\"") #>"},
+<#+
+            }
+#>
+                };
+<#+
+        }
+#>
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
             private static global::Microsoft.OData.Edm.IEdmModel ParsedModel = LoadModelFromString();
-            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
             private const string Edmx = @"<#= escapedEdmxString #>";
-            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
             public static global::Microsoft.OData.Edm.IEdmModel GetInstance()
             {
                 return ParsedModel;
             }
-            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+<#+
+        if (this.context.ReferencesMap != null)
+        {
+#>
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+            private static global::System.Xml.XmlReader getReferencedModelFromMap(global::System.Uri uri)
+            {
+                string referencedEdmx;
+                if (ReferencesMap.TryGetValue(uri.OriginalString, out referencedEdmx)){
+                    return CreateXmlReader(referencedEdmx);
+                }
+
+                return null;
+            }
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+            private static global::Microsoft.OData.Edm.IEdmModel LoadModelFromString()
+            {
+                global::System.Xml.XmlReader reader = CreateXmlReader(Edmx);
+                try
+                {
+                    return global::Microsoft.OData.Edm.Csdl.EdmxReader.Parse(reader, getReferencedModelFromMap);
+                }
+                finally
+                {
+                    ((global::System.IDisposable)(reader)).Dispose();
+                }
+            }
+<#+
+        }
+        else
+        {
+#>
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
             private static global::Microsoft.OData.Edm.IEdmModel LoadModelFromString()
             {
                 global::System.Xml.XmlReader reader = CreateXmlReader(Edmx);
@@ -2269,7 +3269,10 @@ namespace <#= fullNamespace #>
                     ((global::System.IDisposable)(reader)).Dispose();
                 }
             }
-            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+<#+
+        }
+#>
+            [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
             private static global::System.Xml.XmlReader CreateXmlReader(string edmxToParse)
             {
                 return global::System.Xml.XmlReader.Create(new global::System.IO.StringReader(edmxToParse));
@@ -2294,7 +3297,7 @@ namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WriteKeyPropertiesCommentAndAttribute(IEnumerable<string> keyProperties)
+    internal override void WriteKeyPropertiesCommentAndAttribute(IEnumerable<string> keyProperties, string keyString)
     {
 #>
     /// <KeyProperties>
@@ -2307,7 +3310,7 @@ namespace <#= fullNamespace #>
         }
 #>
     /// </KeyProperties>
-    [global::Microsoft.OData.Client.Key("<#= string.Join("\", \"", keyProperties) #>")]
+    [global::Microsoft.OData.Client.Key("<#= keyString #>")]
 <#+
     }
 
@@ -2325,8 +3328,14 @@ namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WriteClassStartForStructuredType(string abstractModifier, string typeName, string baseTypeName)
+    internal override void WriteClassStartForStructuredType(string abstractModifier, string typeName, string originalTypeName, string baseTypeName)
     {
+		if (this.context.EnableNamingAlias)
+		{
+#>
+    [global::Microsoft.OData.Client.OriginalNameAttribute("<#= originalTypeName #>")]
+<#+
+        }
 #>
     public<#= abstractModifier #> partial class <#= typeName #><#= baseTypeName #>
     {
@@ -2342,7 +3351,7 @@ namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WriteParameterCommentForStateicCreateMethod(string parameterName, string propertyName)
+    internal override void WriteParameterCommentForStaticCreateMethod(string parameterName, string propertyName)
     {
 #>
         /// <param name="<#= parameterName #>">Initial value of <#= propertyName #>.</param>
@@ -2352,7 +3361,7 @@ namespace <#= fullNamespace #>
     internal override void WriteDeclarationStartForStaticCreateMethod(string typeName, string fixedTypeName)
     {
 #>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         public static <#= fixedTypeName #> Create<#= typeName #>(<#+
     }
 
@@ -2394,13 +3403,21 @@ namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WritePropertyForStructuredType(string propertyType, string propertyName, string fixedPropertyName, string propertyInitializationValue, bool writeOnPropertyChanged)
+    internal override void WritePropertyForStructuredType(string propertyType, string originalPropertyName, string propertyName, string fixedPropertyName, string propertyInitializationValue, bool writeOnPropertyChanged)
     {
 #>
         /// <summary>
         /// There are no comments for Property <#= propertyName #> in the schema.
         /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+<#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+        [global::Microsoft.OData.Client.OriginalNameAttribute("<#= originalPropertyName #>")]
+<#+
+        }
+#>
         public <#= propertyType #> <#= fixedPropertyName #>
         {
             get
@@ -2416,13 +3433,13 @@ namespace <#= fullNamespace #>
         if (writeOnPropertyChanged)
         {
 #>
-                this.OnPropertyChanged("<#= propertyName #>");
+                this.OnPropertyChanged("<#= originalPropertyName #>");
 <#+
         }
 #>
             }
         }
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         private <#= propertyType #> _<#= propertyName #><#= propertyInitializationValue != null ? " = " + propertyInitializationValue : string.Empty #>;
         partial void On<#= propertyName #>Changing(<#= propertyType #> value);
         partial void On<#= propertyName #>Changed();
@@ -2435,13 +3452,13 @@ namespace <#= fullNamespace #>
         /// <summary>
         /// This event is raised when the value of the property is changed
         /// </summary>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         public event global::System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
         /// <summary>
         /// The value of the property is changed
         /// </summary>
         /// <param name="property">property name</param>
-        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")]
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         protected virtual void OnPropertyChanged(string property)
         {
             if ((this.PropertyChanged != null))
@@ -2475,16 +3492,28 @@ namespace <#= fullNamespace #>
 <#+
     }
 
-	internal override void WriteEnumDeclaration(string enumName, string underlyingType)
+	internal override void WriteEnumDeclaration(string enumName, string originalEnumName, string underlyingType)
     {
+		if (this.context.EnableNamingAlias)
+		{
+#>
+    [global::Microsoft.OData.Client.OriginalNameAttribute("<#= originalEnumName #>")]
+<#+
+        }
 #>
     public enum <#= enumName #><#= underlyingType #>
     {
 <#+
     }
 
-	internal override void WriteMemberForEnumType(string member, bool last)
+	internal override void WriteMemberForEnumType(string member, string originalMemberName, bool last)
     {
+		if (this.context.EnableNamingAlias)
+        {
+#>
+        [global::Microsoft.OData.Client.OriginalNameAttribute("<#= originalMemberName #>")]
+<#+
+        }
 #>
         <#= member #><#= last ? string.Empty : "," #>
 <#+
@@ -2496,6 +3525,218 @@ namespace <#= fullNamespace #>
     }
 <#+
     }
+		
+	internal override void WriteFunctionImportReturnCollectionResult(string functionName, string originalFunctionName, string returnTypeName, string parameters, string parameterValues, bool isComposable)
+    {
+#>
+        /// <summary>
+        /// There are no comments for <#= functionName #> in the schema.
+        /// </summary>
+        public global::Microsoft.OData.Client.DataServiceQuery<<#= returnTypeName #>> <#= functionName #>(<#= parameters #>)
+        {
+            string parameterString = global::Microsoft.OData.Client.Serializer.GetParameterString(this<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+            return this.CreateQuery<<#= returnTypeName #>>("/<#= originalFunctionName #>" + parameterString, <#= isComposable.ToString().ToLower() #>);
+        }
+<#+
+    }
+
+	internal override void WriteFunctionImportReturnSingleResult(string functionName, string originalFunctionName, string returnTypeName, string parameters, string parameterValues, bool isComposable)
+	{
+#>
+        /// <summary>
+        /// There are no comments for <#= functionName #> in the schema.
+        /// </summary>
+        public <#= returnTypeName #> <#= functionName #>(<#= parameters #>)
+        {
+            string parameterString = global::Microsoft.OData.Client.Serializer.GetParameterString(this<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+            return new <#= returnTypeName #>(this, "/<#= originalFunctionName #>" + parameterString, <#= isComposable.ToString().ToLower() #>);
+        }
+<#+
+    }
+
+	internal override void WriteBoundFunctionInEntityTypeReturnCollectionResult(bool hideBaseMethod, string functionName, string originalFunctionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable)
+		{
+#>
+        /// <summary>
+        /// There are no comments for <#= functionName #> in the schema.
+        /// </summary>
+<#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+        [global::Microsoft.OData.Client.OriginalNameAttribute("<#= originalFunctionName #>")]
+<#+
+        }
+#>
+        public <#= hideBaseMethod ? this.OverloadsModifier : string.Empty #>global::Microsoft.OData.Client.DataServiceQuery<<#= returnTypeName #>> <#= functionName #>(<#= parameters #>)
+        {
+            string parameterString = global::Microsoft.OData.Client.Serializer.GetParameterString(this.Context<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+            global::System.Uri requestUri;
+            Context.TryGetUri(this, out requestUri);
+            return this.Context.CreateQuery<<#= returnTypeName #>>(string.Join("/", global::System.Linq.Enumerable.Select(global::System.Linq.Enumerable.Skip(requestUri.Segments, this.Context.BaseUri.Segments.Length), s => s.Trim('/'))) + "/<#= fullNamespace #>.<#= originalFunctionName #>" + parameterString, <#= isComposable.ToString().ToLower() #>);
+        }
+<#+
+        }
+	
+	internal override void WriteBoundFunctionInEntityTypeReturnSingleResult(bool hideBaseMethod, string functionName, string originalFunctionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable)
+    {
+#>
+        /// <summary>
+        /// There are no comments for <#= functionName #> in the schema.
+        /// </summary>
+<#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+        [global::Microsoft.OData.Client.OriginalNameAttribute("<#= originalFunctionName #>")]
+<#+
+        }
+#>
+        public <#= hideBaseMethod ? this.OverloadsModifier : string.Empty #><#= returnTypeName #> <#= functionName #>(<#= parameters #>)
+        {
+            string parameterString = global::Microsoft.OData.Client.Serializer.GetParameterString(this.Context<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+            global::System.Uri requestUri;
+            Context.TryGetUri(this, out requestUri);
+            return new <#= returnTypeName #>(this.Context, string.Join("/", global::System.Linq.Enumerable.Select(global::System.Linq.Enumerable.Skip(requestUri.Segments, this.Context.BaseUri.Segments.Length), s => s.Trim('/'))) + "/<#= fullNamespace #>.<#= originalFunctionName #>" + parameterString, <#= isComposable.ToString().ToLower() #>);
+        }
+<#+
+        }
+
+	internal override void WriteActionImport(string actionName, string originalActionName, string returnTypeName, string parameters, string parameterValues)
+	{
+#>
+        /// <summary>
+        /// There are no comments for <#= actionName #> in the schema.
+        /// </summary>
+        public <#= returnTypeName #> <#= actionName #>(<#= parameters #>)
+        {
+            return new <#= returnTypeName #>(this, this.BaseUri.OriginalString.Trim('/') + "/<#= originalActionName #>"<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+        }
+<#+
+	}
+
+	internal override void WriteBoundActionInEntityType(bool hideBaseMethod, string actionName, string originalActionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues)
+    {
+#>
+        /// <summary>
+        /// There are no comments for <#= actionName #> in the schema.
+        /// </summary>
+        public <#= hideBaseMethod ? this.OverloadsModifier : string.Empty #><#= returnTypeName #> <#= actionName #>(<#= parameters #>)
+        {
+            global::Microsoft.OData.Client.EntityDescriptor resource = Context.EntityTracker.TryGetEntityDescriptor(this);
+            if (resource == null)
+            {
+                throw new global::System.Exception("cannot find entity");
+            }
+
+            return new <#= returnTypeName #>(this.Context, resource.EditLink.OriginalString.Trim('/') + "/<#= fullNamespace #>.<#= originalActionName #>"<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+        }
+<#+
+    }
+	
+	internal override void WriteExtensionMethodsStart()
+    {
+#>
+    /// <summary>
+    /// Class containing all extension methods
+    /// </summary>
+    public static class ExtensionMethods
+    {
+<#+ 
+    }
+
+	internal override void WriteExtensionMethodsEnd()
+    {
+#>
+    }
+<#+
+	}
+
+	internal override void WriteByKeyMethods(string entityTypeName, string returnTypeName)
+	{
+#>
+        /// <summary>
+        /// Get an entity of type <#= entityTypeName #> as <#= entityTypeName + this.singleSuffix #> specified by key from an entity set
+        /// </summary>
+        /// <param name="source">source entity set</param>
+        /// <param name="keys">dictionary with the names and values of keys</param>
+        public static <#= returnTypeName #> ByKey(this global::Microsoft.OData.Client.DataServiceQuery<<#= entityTypeName #>> source, global::System.Collections.Generic.Dictionary<string, object> keys)
+        {
+            return new <#= returnTypeName #>(source.Context, source.GetKeyPath(global::Microsoft.OData.Client.Serializer.GetKeyString(source.Context, keys)));
+        }
+<#+
+    }
+
+	internal override void WriteCastToMethods(string baseTypeName, string derivedTypeName, string derivedTypeFullName, string returnTypeName)
+    {
+#>
+        /// <summary>
+        /// Cast an entity of type <#= baseTypeName #> to its derived type <#= derivedTypeFullName #>
+        /// </summary>
+        /// <param name="source">source entity</param>
+        public static <#= returnTypeName #> CastTo<#= derivedTypeName #>(this global::Microsoft.OData.Client.DataServiceQuerySingle<<#= baseTypeName #>> source)
+        {
+            global::Microsoft.OData.Client.DataServiceQuerySingle<<#= derivedTypeFullName #>> query = source.CastTo<<#= derivedTypeFullName #>>();
+            return new <#= returnTypeName #>(source.Context, query.GetPath(null));
+        }
+<#+
+    }
+
+	internal override void WriteBoundFunctionReturnSingleResultAsExtension(string functionName, string originalFunctionName, string boundTypeName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable)
+    {
+#>
+        /// <summary>
+        /// There are no comments for <#= functionName #> in the schema.
+        /// </summary>
+        public static <#= returnTypeName #> <#= functionName #>(this <#= boundTypeName #> source<#= string.IsNullOrEmpty(parameters) ? string.Empty : ", " + parameters #>)
+        {
+            if (!source.IsComposable)
+            {
+                throw new global::System.NotSupportedException("The previous function is not composable.");
+            }
+
+            string parameterString = global::Microsoft.OData.Client.Serializer.GetParameterString(source.Context<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+            return new <#= returnTypeName #>(source.Context, source.GetPath("<#= fullNamespace #>.<#= originalFunctionName #>" + parameterString), <#= isComposable.ToString().ToLower() #>);
+        }
+<#+
+    }
+
+	internal override void WriteBoundFunctionReturnCollectionResultAsExtension(string functionName, string originalFunctionName, string boundTypeName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable)
+	{
+#>
+        /// <summary>
+        /// There are no comments for <#= functionName #> in the schema.
+        /// </summary>
+        public static global::Microsoft.OData.Client.DataServiceQuery<<#= returnTypeName #>> <#= functionName #>(this <#= boundTypeName #> source<#= string.IsNullOrEmpty(parameters) ? string.Empty : ", " + parameters #>)
+        {
+            if (!source.IsComposable)
+            {
+                throw new global::System.NotSupportedException("The previous function is not composable.");
+            }
+
+            string parameterString = global::Microsoft.OData.Client.Serializer.GetParameterString(source.Context<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+            return source.Context.CreateQuery<<#= returnTypeName #>>(source.GetPath("<#= fullNamespace #>.<#= originalFunctionName #>" + parameterString), <#= isComposable.ToString().ToLower() #>);
+        }
+<#+
+    }
+
+	internal override void WriteBoundActionAsExtension(string actionName, string originalActionName, string boundSourceType, string returnTypeName, string parameters, string fullNamespace, string parameterValues)
+    {
+#>
+        /// <summary>
+        /// There are no comments for <#= actionName #> in the schema.
+        /// </summary>
+        public static <#= returnTypeName #> <#= actionName #>(this <#= boundSourceType #> source<#= string.IsNullOrEmpty(parameters) ? string.Empty : ", " + parameters #>)
+        {
+            if (!source.IsComposable)
+            {
+                throw new global::System.NotSupportedException("The previous function is not composable.");
+            }
+
+            return new <#= returnTypeName #>(source.Context, source.AppendRequestUri("<#= fullNamespace #>.<#= originalActionName #>")<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>);
+        }
+<#+ 
+	}
 
     internal override void WriteNamespaceEnd()
     {
@@ -2510,20 +3751,25 @@ public sealed class ODataClientVBTemplate : ODataClientTemplate
     /// <summary>
     /// Creates an instance of the ODataClientTemplate.
     /// </summary>
-    /// <param name="context">The code generation context.</param>
+    /// <param name="context">The cotion context.</param>
     public ODataClientVBTemplate(CodeGenerationContext context)
         : base(context)
     {
     }
 
 	internal override string GlobalPrefix { get {return string.Empty; } }
-	internal override string SystemTypeTypeName { get { return "Global.System.Type "; } }
+	internal override string SystemTypeTypeName { get { return "Global.System.Type"; } }
 	internal override string AbstractModifier { get { return " MustInherit"; } }
+	internal override string DataServiceActionQueryTypeName { get { return "Global.Microsoft.OData.Client.DataServiceActionQuery"; } }
+	internal override string DataServiceActionQuerySingleOfTStructureTemplate { get { return "Global.Microsoft.OData.Client.DataServiceActionQuerySingle(Of {0})"; } }
+	internal override string DataServiceActionQueryOfTStructureTemplate { get { return "Global.Microsoft.OData.Client.DataServiceActionQuery(Of {0})"; } }
 	internal override string NotifyPropertyChangedModifier { get { return "\r\n        Implements Global.System.ComponentModel.INotifyPropertyChanged"; } }
 	internal override string ClassInheritMarker { get { return "\r\n        Inherits "; } }
 	internal override string ParameterSeparator { get { return ",  _\r\n                    "; } }
 	internal override string SystemNullableStructureTemplate { get { return "Global.System.Nullable(Of {0})"; } }
 	internal override string DataServiceCollectionStructureTemplate { get { return "Global.Microsoft.OData.Client.DataServiceCollection(Of {0})"; } }
+	internal override string DataServiceQueryStructureTemplate { get { return "Global.Microsoft.OData.Client.DataServiceQuery(Of {0})"; } }
+	internal override string DataServiceQuerySingleStructureTemplate { get { return "Global.Microsoft.OData.Client.DataServiceQuerySingle(Of {0})"; } }
 	internal override string ObservableCollectionStructureTemplate { get { return "Global.System.Collections.ObjectModel.ObservableCollection(Of {0})"; } }
 	internal override string ObjectModelCollectionStructureTemplate { get { return "Global.System.Collections.ObjectModel.Collection(Of {0})"; } }
 	internal override string DataServiceCollectionConstructorParameters { get { return "(Nothing, Global.Microsoft.OData.Client.TrackingMode.None)"; } }
@@ -2564,6 +3810,13 @@ public sealed class ODataClientVBTemplate : ODataClientTemplate
 	internal override string EnumTypeName { get { return "Global.System.Enum"; } }
 	internal override string FixPattern { get { return "[{0}]"; } }
 	internal override string EnumUnderlyingTypeMarker { get { return " As "; } }
+	internal override string ConstantExpressionConstructorWithType { get { return "Global.System.Linq.Expressions.Expression.Constant({0}, GetType({1}))"; } }
+	internal override string TypeofFormatter { get { return "GetType({0})"; } }	
+	internal override string UriOperationParameterConstructor { get { return "New Global.Microsoft.OData.Client.UriOperationParameter(\"{0}\", {1})"; } }
+	internal override string BodyOperationParameterConstructor { get { return "New Global.Microsoft.OData.Client.BodyOperationParameter(\"{0}\", {1})"; } }
+	internal override string BaseEntityType { get { return "\r\n        Inherits Global.Microsoft.OData.Client.BaseEntityType"; } }
+	internal override string OverloadsModifier { get { return "Overloads "; } }
+	internal override string ODataVersion { get { return "Global.Microsoft.OData.Core.ODataVersion.V4"; } }
 	internal override HashSet<string> LanguageKeywords { get { 
 		if (VBKeywords == null)
         {
@@ -2618,12 +3871,20 @@ Namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WriteClassStartForEntityContainer(string containerName, string fixedContainerName)
+    internal override void WriteClassStartForEntityContainer(string originalContainerName, string containerName, string fixedContainerName)
     {
 #>
     '''<summary>
     '''There are no comments for <#= containerName #> in the schema.
     '''</summary>
+<#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+    <Global.Microsoft.OData.Client.OriginalNameAttribute("<#= originalContainerName #>")>  _
+<#+
+        }
+#>
     Partial Public Class <#= fixedContainerName #>
         Inherits Global.Microsoft.OData.Client.DataServiceContext
 <#+
@@ -2635,7 +3896,7 @@ Namespace <#= fullNamespace #>
         '''<summary>
         '''Initialize a new <#= containerName #> object.
         '''</summary>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Public Sub New(ByVal serviceRoot As Global.System.Uri)
             MyBase.New(serviceRoot, Global.Microsoft.OData.Client.ODataProtocolVersion.V4)
 <#+
@@ -2682,7 +3943,7 @@ Namespace <#= fullNamespace #>
         '''in Visual Studio is different from the one indicated in the
         '''server schema, use type-mappers to map between the two.
         '''</summary>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Protected Function ResolveTypeFromName(ByVal typeName As String) As Global.System.Type
 <#+
     }
@@ -2719,7 +3980,7 @@ Namespace <#= fullNamespace #>
 	internal override void WritePropertyRootNamespace(string containerName, string fullNamespace)
     {
 #>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Private Shared ROOTNAMESPACE As String = GetType(<#= containerName #>).Namespace.Remove(GetType(<#= containerName #>).Namespace.LastIndexOf("<#= fullNamespace #>"))
 <#+
 	}
@@ -2732,15 +3993,32 @@ Namespace <#= fullNamespace #>
         '''in Visual Studio is different from the one indicated in the
         '''server schema, use type-mappers to map between the two.
         '''</summary>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Protected Function ResolveNameFromType(ByVal clientType As Global.System.Type) As String
 <#+
+        if (this.context.EnableNamingAlias)
+        {
+#>
+            Dim originalNameAttribute As Global.Microsoft.OData.Client.OriginalNameAttribute =
+                CType(Global.System.Linq.Enumerable.SingleOrDefault(Global.Microsoft.OData.Client.Utility.GetCustomAttributes(clientType, GetType(Global.Microsoft.OData.Client.OriginalNameAttribute), true)), Global.Microsoft.OData.Client.OriginalNameAttribute)
+<#+
+    }
     }
 
     internal override void WriteResolveType(string fullNamespace, string languageDependentNamespace)
     {
 #>
             If clientType.Namespace.Equals(String.Concat(ROOTNAMESPACE, "<#= languageDependentNamespace #>"), Global.System.StringComparison.OrdinalIgnoreCase) Then
+<#+
+        if (this.context.EnableNamingAlias)
+        {
+#>
+                If (Not (originalNameAttribute) Is Nothing) Then
+                    Return String.Concat("<#= fullNamespace #>.", originalNameAttribute.OriginalName)
+                End If
+<#+
+        }
+#>
                 Return String.Concat("<#= fullNamespace #>.", clientType.Name)
             End If
 <#+
@@ -2748,61 +4026,109 @@ Namespace <#= fullNamespace #>
 
     internal override void WriteMethodEndForResolveNameFromType(bool modelHasInheritance)
     {
+		if (this.context.EnableNamingAlias && modelHasInheritance)
+        {
+#>
+            If (Not (originalNameAttribute) Is Nothing) Then
+                Dim fullName As String = clientType.FullName.Substring(ROOTNAMESPACE.Length)
+                Return fullName.Remove(fullName.LastIndexOf(clientType.Name)) + originalNameAttribute.OriginalName
+            End If
+<#+
+        }
 #>
             Return <#= modelHasInheritance ? "clientType.FullName.Substring(ROOTNAMESPACE.Length)" : "Nothing" #>
         End Function
 <#+
     }
 
-    internal override void WriteContextEntitySetProperty(string entitySetName, string entitySetFixedName, string entitySetElementTypeName)
+	internal override void WriteConstructorForSingleType(string singleTypeName)
+    {
+#>
+        ''' <summary>
+        ''' Initialize a new <#= singleTypeName #> object.
+        ''' </summary>
+        Public Sub New(ByVal context As Global.Microsoft.OData.Client.DataServiceContext, ByVal path As String)
+            MyBase.New(context, path)
+        End Sub
+
+        ''' <summary>
+        ''' Initialize a new <#= singleTypeName #> object.
+        ''' </summary>
+        Public Sub New(ByVal context As Global.Microsoft.OData.Client.DataServiceContext, ByVal path As String, ByVal isComposable As Boolean)
+            MyBase.New(context, path, isComposable)
+        End Sub
+<#+
+    }
+
+    internal override void WriteContextEntitySetProperty(string entitySetName, string entitySetFixedName, string originalEntitySetName, string entitySetElementTypeName, bool inContext)
     {
 #>
         '''<summary>
         '''There are no comments for <#= entitySetName #> in the schema.
         '''</summary>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Public ReadOnly Property <#= entitySetFixedName #>() As Global.Microsoft.OData.Client.DataServiceQuery(Of <#= entitySetElementTypeName #>)
             Get
+<#+
+		if (!inContext)
+        {
+#>
+                If Not Me.IsComposable Then
+                    Throw New Global.System.NotSupportedException("The previous function is not composable.")
+                End If
+<#+
+        }
+#>
                 If (Me._<#= entitySetName #> Is Nothing) Then
-                    Me._<#= entitySetName #> = MyBase.CreateQuery(Of <#= entitySetElementTypeName #>)("<#= entitySetName #>")
+                    Me._<#= entitySetName #> = <#= inContext ? "MyBase" : "Context"#>.CreateQuery(Of <#= entitySetElementTypeName #>)(<#= inContext ? "\"" + originalEntitySetName + "\"" : "GetPath(\"" + originalEntitySetName + "\")" #>)
                 End If
                 Return Me._<#= entitySetName #>
             End Get
         End Property
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Private _<#= entitySetName #> As Global.Microsoft.OData.Client.DataServiceQuery(Of <#= entitySetElementTypeName #>)
 <#+
     }
 
-	internal override void WriteContextSingletonProperty(string singletonName, string singletonFixedName, string singletonElementTypeName)
+	internal override void WriteContextSingletonProperty(string singletonName, string singletonFixedName, string originalSingletonName, string singletonElementTypeName, bool inContext)
     {
 #>
         '''<summary>
         '''There are no comments for <#= singletonName #> in the schema.
         '''</summary>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
-        Public ReadOnly Property <#= singletonFixedName #>() As Global.Microsoft.OData.Client.DataServiceQuery(Of <#= singletonElementTypeName #>)
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
+        Public ReadOnly Property <#= singletonFixedName #>() As <#= singletonElementTypeName #>
             Get
+<#+
+		if (!inContext)
+        {
+#>
+                If Not Me.IsComposable Then
+                    Throw New Global.System.NotSupportedException("The previous function is not composable.")
+                End If
+<#+
+        }
+#>
                 If (Me._<#= singletonName #> Is Nothing) Then
-                    Me._<#= singletonName #> = MyBase.CreateSingletonQuery(Of <#= singletonElementTypeName #>)("<#= singletonName #>")
+                    Me._<#= singletonName #> = New <#= singletonElementTypeName #>(<#= inContext ? "Me" : "Me.Context" #>, <#= inContext ? "\"" + originalSingletonName + "\"" : "GetPath(\"" + originalSingletonName + "\")" #>)
                 End If
                 Return Me._<#= singletonName #>
             End Get
         End Property
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
-        Private _<#= singletonName #> As Global.Microsoft.OData.Client.DataServiceQuery(Of <#= singletonElementTypeName #>)
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
+        Private _<#= singletonName #> As <#= singletonElementTypeName #>
 <#+
     }
 
-    internal override void WriteContextAddToEntitySetMethod(string entitySetName, string typeName, string parameterName)
+    internal override void WriteContextAddToEntitySetMethod(string entitySetName, string originalEntitySetName, string typeName, string parameterName)
     {
 #>
         '''<summary>
         '''There are no comments for <#= entitySetName #> in the schema.
         '''</summary>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Public Sub AddTo<#= entitySetName #>(ByVal <#= parameterName #> As <#= typeName #>)
-            MyBase.AddObject("<#= entitySetName #>", <#= parameterName #>)
+            MyBase.AddObject("<#= originalEntitySetName #>", <#= parameterName #>)
         End Sub
 <#+
     }
@@ -2811,17 +4137,63 @@ Namespace <#= fullNamespace #>
     {
 		escapedEdmxString = escapedEdmxString.Replace("\r\n", "\" & _\r\n \"");
 #>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Private MustInherit Class GeneratedEdmModel
-            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+<#+
+        if (this.context.ReferencesMap != null)
+        {
+#>
+            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
+            Private Shared ReferencesMap As Global.System.Collections.Generic.Dictionary(Of string, string) = New Global.System.Collections.Generic.Dictionary(Of string, string) From
+                {
+<#+
+            int count = this.context.ReferencesMap.Count();
+            foreach(var reference in this.context.ReferencesMap)
+            {
+#>
+                    {"<#= reference.Key.OriginalString.Replace("\"", "\"\"") #>", "<#= Utils.SerializeToString(reference.Value).Replace("\"", "\"\"").Replace("\r\n", "\" & _\r\n \"") #>"}<#= (--count>0?",":"")#>
+<#+
+            }
+#>
+                }
+<#+
+        }
+#>
+            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
             Private Shared ParsedModel As Global.Microsoft.OData.Edm.IEdmModel = LoadModelFromString
-            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
             Private Const Edmx As String = "<#= escapedEdmxString #>"
-            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
             Public Shared Function GetInstance() As Global.Microsoft.OData.Edm.IEdmModel
                 Return ParsedModel
             End Function
-            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+<#+
+        if (this.context.ReferencesMap != null)
+        {
+#>
+            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
+            Private Shared Function getReferencedModelFromMap(ByVal uri As Global.System.Uri) As Global.System.Xml.XmlReader
+                Dim referencedEdmx As String = Nothing
+                If (ReferencesMap.TryGetValue(uri.OriginalString, referencedEdmx)) Then
+                    Return CreateXmlReader(referencedEdmx)
+                End If
+                Return Nothing
+            End Function
+            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
+            Private Shared Function LoadModelFromString() As Global.Microsoft.OData.Edm.IEdmModel
+                Dim reader As Global.System.Xml.XmlReader = CreateXmlReader(Edmx)
+                Try
+                    Return Global.Microsoft.OData.Edm.Csdl.EdmxReader.Parse(reader, AddressOf getReferencedModelFromMap)
+                Finally
+                    CType(reader,Global.System.IDisposable).Dispose
+                End Try
+            End Function
+<#+
+        }
+        else
+        {
+#>
+            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
             Private Shared Function LoadModelFromString() As Global.Microsoft.OData.Edm.IEdmModel
                 Dim reader As Global.System.Xml.XmlReader = CreateXmlReader(Edmx)
                 Try
@@ -2830,7 +4202,10 @@ Namespace <#= fullNamespace #>
                     CType(reader,Global.System.IDisposable).Dispose
                 End Try
             End Function
-            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+<#+
+        }
+#>
+            <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
             Private Shared Function CreateXmlReader(ByVal edmxToParse As String) As Global.System.Xml.XmlReader
                 Return Global.System.Xml.XmlReader.Create(New Global.System.IO.StringReader(edmxToParse))
             End Function
@@ -2854,7 +4229,7 @@ Namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WriteKeyPropertiesCommentAndAttribute(IEnumerable<string> keyProperties)
+    internal override void WriteKeyPropertiesCommentAndAttribute(IEnumerable<string> keyProperties, string keyString)
     {
 #>
     '''<KeyProperties>
@@ -2867,7 +4242,7 @@ Namespace <#= fullNamespace #>
 		} 
 #>
     '''</KeyProperties>
-    <Global.Microsoft.OData.Client.Key("<#= string.Join("\", \"", keyProperties) #>")>  _
+    <Global.Microsoft.OData.Client.Key("<#= keyString #>")>  _
 <#+
     }
 
@@ -2885,8 +4260,14 @@ Namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WriteClassStartForStructuredType(string abstractModifier, string typeName, string baseTypeName)
+    internal override void WriteClassStartForStructuredType(string abstractModifier, string typeName, string originalTypeName, string baseTypeName)
     {
+		if (this.context.EnableNamingAlias)
+    {
+#>
+	<Global.Microsoft.OData.Client.OriginalNameAttribute("<#= originalTypeName #>")>  _
+<#+
+		}
 #>
     Partial Public<#= abstractModifier #> Class <#= typeName #><#= baseTypeName #>
 <#+
@@ -2901,7 +4282,7 @@ Namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WriteParameterCommentForStateicCreateMethod(string parameterName, string propertyName)
+    internal override void WriteParameterCommentForStaticCreateMethod(string parameterName, string propertyName)
     {
 #>
         '''<param name="<#= parameterName #>">Initial value of <#= propertyName #>.</param>
@@ -2911,7 +4292,7 @@ Namespace <#= fullNamespace #>
     internal override void WriteDeclarationStartForStaticCreateMethod(string typeName, string fixedTypeName)
     {
 #>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Public Shared Function Create<#= typeName #>(<#+
 
     }
@@ -2952,13 +4333,21 @@ Namespace <#= fullNamespace #>
 <#+
     }
 
-    internal override void WritePropertyForStructuredType(string propertyType, string propertyName, string fixedPropertyName, string propertyInitializationValue, bool writeOnPropertyChanged)
+    internal override void WritePropertyForStructuredType(string propertyType, string originalPropertyName, string propertyName, string fixedPropertyName, string propertyInitializationValue, bool writeOnPropertyChanged)
     {
 #>
         '''<summary>
         '''There are no comments for Property <#= propertyName #> in the schema.
         '''</summary>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
+<#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+        <Global.Microsoft.OData.Client.OriginalNameAttribute("<#= originalPropertyName #>")>  _
+<#+
+        }
+#>
         Public Property <#= fixedPropertyName #>() As <#= propertyType #>
             Get
                 Return Me._<#= propertyName #>
@@ -2971,13 +4360,13 @@ Namespace <#= fullNamespace #>
         if (writeOnPropertyChanged)
         {
 #>
-                Me.OnPropertyChanged("<#= propertyName #>")
+                Me.OnPropertyChanged("<#= originalPropertyName #>")
 <#+
         }
 #>
             End Set
         End Property
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
 <#+
 		string constructorString = string.Empty;
 		if (!string.IsNullOrEmpty(propertyInitializationValue))
@@ -2999,13 +4388,13 @@ Namespace <#= fullNamespace #>
         ''' <summary>
         ''' This event is raised when the value of the property is changed
         ''' </summary>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Public Event PropertyChanged As Global.System.ComponentModel.PropertyChangedEventHandler Implements Global.System.ComponentModel.INotifyPropertyChanged.PropertyChanged
         ''' <summary>
         ''' The value of the property is changed
         ''' </summary>
         ''' <param name="property">property name</param>
-        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "1.0.0")>  _
+        <Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")>  _
         Protected Overridable Sub OnPropertyChanged(ByVal [property] As String)
             If (Not (Me.PropertyChangedEvent) Is Nothing) Then
                 RaiseEvent PropertyChanged(Me, New Global.System.ComponentModel.PropertyChangedEventArgs([property]))
@@ -3037,15 +4426,27 @@ Namespace <#= fullNamespace #>
 <#+
     }
 
-	internal override void WriteEnumDeclaration(string enumName, string underlyingType)
+	internal override void WriteEnumDeclaration(string enumName, string originalEnumName, string underlyingType)
     {
+		if (this.context.EnableNamingAlias)
+    {
+#>
+	<Global.Microsoft.OData.Client.OriginalNameAttribute("<#= originalEnumName #>")>  _
+<#+
+		}
 #>
     Public Enum <#= enumName #><#= underlyingType #>
 <#+
     }
 
-	internal override void WriteMemberForEnumType(string member, bool last)
+	internal override void WriteMemberForEnumType(string member, string originalMemberName, bool last)
     {
+		if (this.context.EnableNamingAlias)
+        {
+#>
+	    <Global.Microsoft.OData.Client.OriginalNameAttribute("<#= originalMemberName #>")>  _
+<#+
+        }
 #>
         <#= member #>
 <#+
@@ -3057,6 +4458,204 @@ Namespace <#= fullNamespace #>
     End Enum
 <#+
     }
+	
+	internal override void WriteFunctionImportReturnCollectionResult(string functionName, string originalFunctionName, string returnTypeName, string parameters, string parameterValues, bool isComposable)
+    {
+#>
+        ''' <summary>
+        ''' There are no comments for <#= functionName #> in the schema.
+        ''' </summary>
+        Public Function <#= functionName #>(<#= parameters #>) As Global.Microsoft.OData.Client.DataServiceQuery(Of <#= returnTypeName #>)
+            Dim parameterString As String = Global.Microsoft.OData.Client.Serializer.GetParameterString(Me<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+            Return Me.CreateQuery(Of <#= returnTypeName #>)("/<#= originalFunctionName #>" + parameterString, <#= isComposable #>)
+        End Function
+<#+
+    }
+
+	internal override void WriteFunctionImportReturnSingleResult(string functionName, string originalFunctionName, string returnTypeName, string parameters, string parameterValues, bool isComposable)
+    {
+#>
+        ''' <summary>
+        ''' There are no comments for <#= functionName #> in the schema.
+        ''' </summary>
+        Public Function <#= functionName #>(<#= parameters #>) As <#= returnTypeName #>
+            Dim parameterString As String = Global.Microsoft.OData.Client.Serializer.GetParameterString(Me<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+            Return New <#= returnTypeName #>(Me, "/<#= originalFunctionName #>" + parameterString, <#= isComposable #>)
+        End Function
+<#+
+    }
+
+	internal override void WriteBoundFunctionInEntityTypeReturnCollectionResult(bool hideBaseMethod, string functionName, string originalFunctionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable)
+    {
+#>
+        ''' <summary>
+        ''' There are no comments for <#= functionName #> in the schema.
+        ''' </summary>
+<#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+        <Global.Microsoft.OData.Client.OriginalNameAttribute("<#= originalFunctionName #>")>  _
+<#+
+        }
+#>
+        Public <#= hideBaseMethod ? this.OverloadsModifier : string.Empty #>Function <#= functionName #>(<#= parameters #>) As Global.Microsoft.OData.Client.DataServiceQuery(Of <#= returnTypeName #>)
+            Dim parameterString As String = Global.Microsoft.OData.Client.Serializer.GetParameterString(Me.Context<#=string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+            Dim requestUri As Global.System.Uri = Nothing
+            Context.TryGetUri(Me, requestUri)
+            Return Me.Context.CreateQuery(Of <#= returnTypeName #>)(String.Join("/", Global.System.Linq.Enumerable.Select(Global.System.Linq.Enumerable.Skip(requestUri.Segments, Me.Context.BaseUri.Segments.Length), Function(s) s.Trim("/"C))) + "/<#= fullNamespace #>.<#= originalFunctionName #>" + parameterString, <#= isComposable #>)
+        End Function
+<#+
+    }
+
+	internal override void WriteBoundFunctionInEntityTypeReturnSingleResult(bool hideBaseMethod, string functionName, string originalFunctionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable)
+    {
+#>
+        ''' <summary>
+        ''' There are no comments for <#= functionName #> in the schema.
+        ''' </summary>
+<#+
+		if (this.context.EnableNamingAlias)
+        {
+#>
+        <Global.Microsoft.OData.Client.OriginalNameAttribute("<#= originalFunctionName #>")>  _
+<#+
+        }
+#>
+		Public <#= hideBaseMethod ? this.OverloadsModifier : string.Empty #>Function <#= functionName #>(<#= parameters #>) As <#= returnTypeName #>
+            Dim parameterString As String = Global.Microsoft.OData.Client.Serializer.GetParameterString(Me.Context<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+            Dim requestUri As Global.System.Uri = Nothing
+            Context.TryGetUri(Me, requestUri)
+            Return New <#= returnTypeName #>(Me.Context, String.Join("/", Global.System.Linq.Enumerable.Select(Global.System.Linq.Enumerable.Skip(requestUri.Segments, Me.Context.BaseUri.Segments.Length), Function(s) s.Trim("/"C))) + "/<#= fullNamespace #>.<#= originalFunctionName #>" + parameterString, <#= isComposable #>)
+        End Function
+<#+
+    }
+	
+	internal override void WriteActionImport(string actionName, string originalActionName, string returnTypeName, string parameters, string parameterValues)
+	{
+#>
+        ''' <summary>
+        ''' There are no comments for <#= actionName #> in the schema.
+        ''' </summary>
+        Public Function <#= actionName #>(<#= parameters #>) As <#= returnTypeName #>
+            Return New <#= returnTypeName #>(Me, Me.BaseUri.OriginalString.Trim("/"C) + "/<#= originalActionName #>"<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+        End Function
+<#+
+	}
+	
+	internal override void WriteBoundActionInEntityType(bool hideBaseMethod, string actionName, string originalActionName, string returnTypeName, string parameters, string fullNamespace, string parameterValues)
+	{
+#>
+        ''' <summary>
+        ''' There are no comments for <#= actionName #> in the schema.
+        ''' </summary>
+        Public <#= hideBaseMethod ? this.OverloadsModifier : string.Empty #>Function <#= actionName #>(<#= parameters #>) As <#= returnTypeName #>
+            Dim resource As Global.Microsoft.OData.Client.EntityDescriptor = Context.EntityTracker.TryGetEntityDescriptor(Me)
+            If resource Is Nothing Then
+                Throw New Global.System.Exception("cannot find entity")
+            End If
+
+            Return New <#= returnTypeName #>(Me.Context, resource.EditLink.OriginalString.Trim("/"C) + "/<#= fullNamespace #>.<#= originalActionName #>"<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+        End Function
+<#+
+	}
+
+	internal override void WriteExtensionMethodsStart()
+    {
+#>
+    ''' <summary>
+    ''' Class containing all extension methods
+    ''' </summary>
+    Public Module ExtensionMethods
+<#+
+	}
+
+	internal override void WriteExtensionMethodsEnd()
+    {
+#>
+    End Module
+<#+
+	}
+
+	internal override void WriteByKeyMethods(string entityTypeName, string returnTypeName)
+    {
+#>
+        ''' <summary>
+        ''' Get an entity of type <#= entityTypeName #> as <#= entityTypeName + this.singleSuffix #> specified by key from an entity set
+        ''' </summary>
+        ''' <param name="source">source entity set</param>
+        ''' <param name="keys">dictionary with the names and values of keys</param>
+        <Global.System.Runtime.CompilerServices.Extension()>
+        Public Function ByKey(ByVal source As Global.Microsoft.OData.Client.DataServiceQuery(Of <#= entityTypeName #>), ByVal keys As Global.System.Collections.Generic.Dictionary(Of String, Object)) As <#= returnTypeName #>
+            Return New <#= returnTypeName #>(source.Context, source.GetKeyPath(Global.Microsoft.OData.Client.Serializer.GetKeyString(source.Context, keys)))
+        End Function
+<#+
+	}
+
+	internal override void WriteCastToMethods(string baseTypeName, string derivedTypeName, string derivedTypeFullName, string returnTypeName)
+    {
+#>
+		''' <summary>
+        ''' Cast an entity of type <#= baseTypeName #> to its derived type <#= derivedTypeFullName #>
+        ''' </summary>
+        ''' <param name="source">source entity</param>
+        <Global.System.Runtime.CompilerServices.Extension()>
+        Public Function CastTo<#= derivedTypeName #>(ByVal source As Global.Microsoft.OData.Client.DataServiceQuerySingle(Of <#= baseTypeName #>)) As <#= returnTypeName #>
+            Dim query As Global.Microsoft.OData.Client.DataServiceQuerySingle(Of <#= derivedTypeFullName #>) = source.CastTo(Of <#= derivedTypeFullName #>)()
+            Return New <#= returnTypeName #>(source.Context, query.GetPath(Nothing))
+        End Function
+<#+
+    }
+
+	internal override void WriteBoundFunctionReturnSingleResultAsExtension(string functionName, string originalFunctionName, string boundTypeName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable)
+    {
+#>
+        ''' <summary>
+        ''' There are no comments for <#= functionName #> in the schema.
+        ''' </summary>
+        <Global.System.Runtime.CompilerServices.Extension()>
+        Public Function <#= functionName #>(ByVal source As <#= boundTypeName #><#= string.IsNullOrEmpty(parameters) ? string.Empty : ", " + parameters #>) As <#= returnTypeName #>
+            If Not source.IsComposable Then
+                Throw New Global.System.NotSupportedException("The previous function is not composable.")
+            End If
+            Dim parameterString As String = Global.Microsoft.OData.Client.Serializer.GetParameterString(source.Context<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+            Return New <#= returnTypeName #>(source.Context, source.GetPath("<#= fullNamespace #>.<#= originalFunctionName #>" + parameterString), <#= isComposable #>)
+        End Function
+<#+
+	}
+
+	internal override void WriteBoundFunctionReturnCollectionResultAsExtension(string functionName, string originalFunctionName, string boundTypeName, string returnTypeName, string parameters, string fullNamespace, string parameterValues, bool isComposable)
+    {
+#>
+        ''' <summary>
+        ''' There are no comments for <#= functionName #> in the schema.
+        ''' </summary>
+        <Global.System.Runtime.CompilerServices.Extension()>
+        Public Function <#= functionName #>(ByVal source As <#= boundTypeName #><#= string.IsNullOrEmpty(parameters) ? string.Empty : ", " + parameters #>) As Global.Microsoft.OData.Client.DataServiceQuery(Of <#= returnTypeName #>)
+            If Not source.IsComposable Then
+                Throw New Global.System.NotSupportedException("The previous function is not composable.")
+            End If
+            Dim parameterString As String = Global.Microsoft.OData.Client.Serializer.GetParameterString(source.Context<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+            Return source.Context.CreateQuery(Of <#= returnTypeName #>)(source.GetPath("<#= fullNamespace #>.<#= originalFunctionName #>" + parameterString), <#= isComposable #>)
+        End Function
+<#+
+	}
+
+	internal override void WriteBoundActionAsExtension(string actionName, string originalActionName, string boundSourceType, string returnTypeName, string parameters, string fullNamespace, string parameterValues)
+    {
+#>
+        ''' <summary>
+        ''' There are no comments for <#= actionName #> in the schema.
+        ''' </summary>
+        <Global.System.Runtime.CompilerServices.Extension()>
+        Public Function <#= actionName #>(ByVal source As <#= boundSourceType #><#= string.IsNullOrEmpty(parameters) ? string.Empty : ", " + parameters #>) As <#= returnTypeName #>
+            If Not source.IsComposable Then
+                Throw New Global.System.NotSupportedException("The previous function is not composable.")
+            End If
+            Return New <#= returnTypeName #>(source.Context, source.AppendRequestUri("<#= fullNamespace #>.<#= originalActionName #>")<#= string.IsNullOrEmpty(parameterValues) ? string.Empty : ", " + parameterValues #>)
+        End Function
+<#+
+	}
 
     internal override void WriteNamespaceEnd()
     {

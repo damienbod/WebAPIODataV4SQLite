@@ -60,23 +60,21 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ODataClient1.cs">
+    <Compile Include="ODataClientModel.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
-      <DependentUpon>ODataClient1.tt</DependentUpon>
+      <DependentUpon>ODataClientModel.tt</DependentUpon>
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="ODataClient1.odata.config">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="ODataClient1.tt">
+    <None Include="ODataClientModel.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
-      <LastGenOutput>ODataClient1.cs</LastGenOutput>
+      <LastGenOutput>ODataClientModel.cs</LastGenOutput>
     </None>
+    <None Include="ODataClientModel.ttinclude" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

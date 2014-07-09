@@ -4,12 +4,12 @@ using System.Net;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.OData;
-using System.Web.OData.Query;
 using System.Web.OData.Routing;
 using WebAPIODataV4SQLite.DomainModel;
 
 namespace WebAPIODataV4SQLite.Controllers
 {
+    [ODataRoutePrefix("EventData")]
     public class EventDataController : ODataController
     {
         readonly SqliteContext _sqliteContext;
@@ -26,8 +26,8 @@ namespace WebAPIODataV4SQLite.Controllers
         }
 
         [HttpPost]
-        [ODataRoute("EventData")]
-        public async Task<IHttpActionResult> CreateEventData(EventData eventData)
+        [ODataRoute("")]
+        public async Task<IHttpActionResult> Post(EventData eventData)
         {
             if (eventData !=null && !ModelState.IsValid)
             {
@@ -47,7 +47,7 @@ namespace WebAPIODataV4SQLite.Controllers
         }
 
         [HttpPut]
-        [ODataRoute("EventData")]
+        [ODataRoute("")]
         public async Task<IHttpActionResult> Put([FromODataUri] int key, EventData eventData)
         {
             if (eventData != null && !ModelState.IsValid)
@@ -67,7 +67,7 @@ namespace WebAPIODataV4SQLite.Controllers
         }
 
         [HttpPut]
-        [ODataRoute("EventData")]
+        [ODataRoute("")]
         public async Task<IHttpActionResult> Patch([FromODataUri] int key, Delta<EventData> delta)
         {
             if (!ModelState.IsValid)
@@ -89,7 +89,7 @@ namespace WebAPIODataV4SQLite.Controllers
 
 
         [HttpDelete]
-        [ODataRoute("EventData")]
+        [ODataRoute("")]
         public async Task<IHttpActionResult> Delete([FromODataUri] int key)
         {
             var entity = _sqliteContext.EventDataEntities.FirstOrDefault(t => t.EventDataId == key);

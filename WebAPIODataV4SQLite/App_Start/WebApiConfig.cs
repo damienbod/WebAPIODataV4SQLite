@@ -26,15 +26,17 @@ namespace WebAPIODataV4SQLite
                 defaults: new { id = RouteParameter.Optional }
             );
 
+	        var server = new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer);
+			
             config.MapODataServiceRoute("odata", "odata", model: GetModel());
-            config.MapODataServiceRoute("odatabatching", "odatabatching", GetModel(), new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer));
+			//config.MapODataServiceRoute("odatabatching", "odatabatching", GetModel(), server);
             return config;
         }
 
         public static IEdmModel GetModel()
         {
             ODataModelBuilder builder = new ODataConventionModelBuilder();
-            builder.ContainerName = "DamienbodContext";
+            builder.ContainerName = "SqliteContext";
             builder.EntitySet<AnimalType>("AnimalType");
             builder.EntitySet<EventData>("EventData");
 
