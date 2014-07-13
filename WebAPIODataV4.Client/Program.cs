@@ -39,7 +39,7 @@ namespace WebAPIODataV4.Client
 			context.AddAndUpdateResponsePreference = DataServiceResponsePreference.IncludeContent;
 
 			// Add the data to the server
-			DataServiceResponse response = context.SaveChanges(SaveChangesOptions.ReplaceOnUpdate);
+			DataServiceResponse response = context.SaveChanges(SaveChangesOptions.BatchWithSingleChangeset);
 
             foreach (OperationResponse individualResponse in response)
             {

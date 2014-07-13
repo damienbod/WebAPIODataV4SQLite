@@ -5,3 +5,5 @@ WebAPIODataV4.Client.v12.suo
 WebAPIODataV4.Client/bin/Debug
 WebAPIODataV4.Client/obj
 WebAPIODataV4.Client/bin
+ODataBatchingWithActions/bin
+ODataBatchingWithActions/obj

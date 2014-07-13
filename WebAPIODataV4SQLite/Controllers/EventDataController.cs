@@ -5,10 +5,12 @@ using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.OData;
 using System.Web.OData.Routing;
+using WebApiContrib.Tracing.Slab;
 using WebAPIODataV4SQLite.DomainModel;
 
 namespace WebAPIODataV4SQLite.Controllers
 {
+	[SlabLoggingFilterAttribute]
     [ODataRoutePrefix("EventData")]
     public class EventDataController : ODataController
     {
@@ -19,6 +21,7 @@ namespace WebAPIODataV4SQLite.Controllers
             _sqliteContext = sqliteContext;
         }
 
+		[SlabLoggingFilter]
         [EnableQuery(PageSize = 20)]
         public IHttpActionResult Get()
         {
