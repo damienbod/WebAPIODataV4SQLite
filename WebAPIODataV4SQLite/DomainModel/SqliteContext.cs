@@ -7,6 +7,7 @@ namespace WebAPIODataV4SQLite.DomainModel
     {
         public SqliteContext()
         {
+	        this.Configuration.ProxyCreationEnabled = false;
             // Turn off the Migrations, (NOT a code first Db)
             Database.SetInitializer<SqliteContext>(null);
         }

@@ -6,6 +6,11 @@ using System.Web.Http.Tracing;
 using System.Web.OData.Batch;
 using System.Web.OData.Builder;
 using System.Web.OData.Extensions;
+using System.Web.OData.Formatter;
+using System.Web.OData.Formatter.Deserialization;
+using System.Web.OData.Formatter.Serialization;
+using System.Web.OData.Routing;
+using System.Web.OData.Routing.Conventions;
 using CacheCow.Server;
 using Microsoft.OData.Edm;
 using Microsoft.Practices.Unity.WebApi;
@@ -39,10 +44,28 @@ namespace WebAPIODataV4SQLite
 			var cacheCowCacheHandler = new CachingHandler(config);
 			config.MessageHandlers.Add(cacheCowCacheHandler);
 
+			// Required if you want to use application/xml
+			var odataFormatters = ODataMediaTypeFormatters.Create();
+			config.Formatters.InsertRange(0, odataFormatters);
+
+			//config.MapODataServiceRoute("odata", "odata", GetModel(), new MyODataPathHandler(), ODataRoutingConventions.CreateDefault());
+
             config.MapODataServiceRoute("odata", "odata", model: GetModel());
 			//config.MapODataServiceRoute("odatabatching", "odatabatching", GetModel(), server);
             return config;
         }
+
+		class MyODataPathHandler : DefaultODataPathHandler
+		{
+			public override string Link(ODataPath path)
+			{
+				if (path.PathTemplate == "~")
+				{
+					return path.ToString() + "/";
+				}
+				return base.Link(path);
+			}
+		}
 
         public static IEdmModel GetModel()
         {

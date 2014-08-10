@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Data.Entity.Migrations;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.OData;
@@ -33,11 +35,11 @@ namespace WebAPIODataV4SQLite.Controllers
 		[EnableQuery(PageSize = 20)]
 		public IHttpActionResult Get([FromODataUri] int key)
 		{
+			//if (Request.Headers.Accept.Count == 0)
+			//	Request.Headers.Add("Accept", "application/atom+xml");
+
 			return Ok(_adm);
 		}
-
-		
-
 
 		protected override void Dispose(bool disposing)
 		{

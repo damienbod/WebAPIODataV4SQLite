@@ -1,6 +1,8 @@
 ﻿using System.Data.Entity.Migrations;
 using System.Linq;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.OData;
@@ -22,9 +24,12 @@ namespace WebAPIODataV4SQLite.Controllers
         }
 
 		[SlabLoggingFilter]
-        [EnableQuery(PageSize = 20)]
+        [EnableQuery(PageSize = 20)]		
         public IHttpActionResult Get()
         {
+			// We want to force xml for the odata feed
+			Request.Headers.Accept.Clear();
+			Request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
             return Ok(_sqliteContext.EventDataEntities.AsQueryable());
         }
 
