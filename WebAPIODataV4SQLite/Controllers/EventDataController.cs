@@ -1,10 +1,13 @@
 ﻿using System.Data.Entity.Migrations;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Runtime.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
+using System.Web.Http.Hosting;
 using System.Web.OData;
 using System.Web.OData.Routing;
 using WebApiContrib.Tracing.Slab;
@@ -28,8 +31,8 @@ namespace WebAPIODataV4SQLite.Controllers
         public IHttpActionResult Get()
         {
 			// We want to force xml for the odata feed
-			Request.Headers.Accept.Clear();
-			Request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+			//Request.Headers.Accept.Clear();
+			//Request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
             return Ok(_sqliteContext.EventDataEntities.AsQueryable());
         }
 

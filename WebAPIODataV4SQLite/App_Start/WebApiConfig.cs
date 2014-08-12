@@ -16,6 +16,7 @@ using Microsoft.OData.Edm;
 using Microsoft.Practices.Unity.WebApi;
 using WebApiContrib.Tracing.Slab;
 using WebAPIODataV4SQLite.App_Start;
+using WebAPIODataV4SQLite.Controllers;
 using WebAPIODataV4SQLite.DomainModel;
 
 namespace WebAPIODataV4SQLite
@@ -45,13 +46,12 @@ namespace WebAPIODataV4SQLite
 			config.MessageHandlers.Add(cacheCowCacheHandler);
 
 			// Required if you want to use application/xml
-			var odataFormatters = ODataMediaTypeFormatters.Create();
-			config.Formatters.InsertRange(0, odataFormatters);
+			//var odataFormatters = ODataMediaTypeFormatters.Create();
+			//config.Formatters.InsertRange(0, odataFormatters);
 
 			//config.MapODataServiceRoute("odata", "odata", GetModel(), new MyODataPathHandler(), ODataRoutingConventions.CreateDefault());
-
-            config.MapODataServiceRoute("odata", "odata", model: GetModel());
-			//config.MapODataServiceRoute("odatabatching", "odatabatching", GetModel(), server);
+            // config.MapODataServiceRoute("odata", "odata", model: GetModel());
+			config.MapODataServiceRoute("odataBatch", "odata", GetModel(), new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer));
             return config;
         }
 

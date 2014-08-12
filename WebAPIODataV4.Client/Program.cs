@@ -10,7 +10,8 @@ namespace WebAPIODataV4.Client
     {
         static void Main(string[] args)
         {
-            var context = new SqliteContext(new Uri("http://localhost:59145/odata/"));
+			// ipv4.fiddler:59145/odata/Adms%288%29
+			var context = new SqliteContext(new Uri("http://localhost.fiddler:59145/odata/"));
             context.Format.UseJson();
 
 			// Call some basic Get
@@ -31,11 +32,11 @@ namespace WebAPIODataV4.Client
 
 			// Update a new entity
             var dataToUpdate = eventDataItems.FirstOrDefault();
-            dataToUpdate.Factor = 98;
+            dataToUpdate.Factor = 99;
             dataToUpdate.FixChange = 97;
 
 			context.AddToEventData(newObjectEventData);
-            context.UpdateObject(dataToUpdate);
+			context.UpdateObject(dataToUpdate);
 			context.AddAndUpdateResponsePreference = DataServiceResponsePreference.IncludeContent;
 
 			// Add the data to the server
