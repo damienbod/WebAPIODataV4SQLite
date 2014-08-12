@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generation date: 09.07.2014 23:08:20
+// Generation date: 12.08.2014 23:32:51
 namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
 {
     /// <summary>
@@ -234,17 +234,11 @@ namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
         /// Create a new EventData object.
         /// </summary>
         /// <param name="eventDataId">Initial value of EventDataId.</param>
-        /// <param name="factor">Initial value of Factor.</param>
-        /// <param name="fixChange">Initial value of FixChange.</param>
-        /// <param name="animalTypeId">Initial value of AnimalTypeId.</param>
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
-        public static EventData CreateEventData(long eventDataId, int factor, double fixChange, long animalTypeId)
+        public static EventData CreateEventData(long eventDataId)
         {
             EventData eventData = new EventData();
             eventData.EventDataId = eventDataId;
-            eventData.Factor = factor;
-            eventData.FixChange = fixChange;
-            eventData.AnimalTypeId = animalTypeId;
             return eventData;
         }
         /// <summary>
@@ -275,7 +269,7 @@ namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         [global::Microsoft.OData.Client.OriginalNameAttribute("Factor")]
-        public int Factor
+        public global::System.Nullable<int> Factor
         {
             get
             {
@@ -290,8 +284,8 @@ namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
             }
         }
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
-        private int _Factor;
-        partial void OnFactorChanging(int value);
+        private global::System.Nullable<int> _Factor;
+        partial void OnFactorChanging(global::System.Nullable<int> value);
         partial void OnFactorChanged();
         /// <summary>
         /// There are no comments for Property StringTestId in the schema.
@@ -321,7 +315,7 @@ namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         [global::Microsoft.OData.Client.OriginalNameAttribute("FixChange")]
-        public double FixChange
+        public global::System.Nullable<double> FixChange
         {
             get
             {
@@ -336,15 +330,15 @@ namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
             }
         }
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
-        private double _FixChange;
-        partial void OnFixChangeChanging(double value);
+        private global::System.Nullable<double> _FixChange;
+        partial void OnFixChangeChanging(global::System.Nullable<double> value);
         partial void OnFixChangeChanged();
         /// <summary>
         /// There are no comments for Property AnimalTypeId in the schema.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         [global::Microsoft.OData.Client.OriginalNameAttribute("AnimalTypeId")]
-        public long AnimalTypeId
+        public global::System.Nullable<long> AnimalTypeId
         {
             get
             {
@@ -359,8 +353,8 @@ namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
             }
         }
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
-        private long _AnimalTypeId;
-        partial void OnAnimalTypeIdChanging(long value);
+        private global::System.Nullable<long> _AnimalTypeId;
+        partial void OnAnimalTypeIdChanging(global::System.Nullable<long> value);
         partial void OnAnimalTypeIdChanged();
         /// <summary>
         /// There are no comments for Property AnimalType in the schema.
@@ -1042,6 +1036,132 @@ namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
         }
     }
     /// <summary>
+    /// There are no comments for AdmDtoSingle in the schema.
+    /// </summary>
+    [global::Microsoft.OData.Client.OriginalNameAttribute("AdmDtoSingle")]
+    public partial class AdmDtoSingle : global::Microsoft.OData.Client.DataServiceQuerySingle<AdmDto>
+    {
+        /// <summary>
+        /// Initialize a new AdmDtoSingle object.
+        /// </summary>
+        public AdmDtoSingle(global::Microsoft.OData.Client.DataServiceContext context, string path)
+            : base(context, path) {}
+
+        /// <summary>
+        /// Initialize a new AdmDtoSingle object.
+        /// </summary>
+        public AdmDtoSingle(global::Microsoft.OData.Client.DataServiceContext context, string path, bool isComposable)
+            : base(context, path, isComposable) {}
+    }
+    /// <summary>
+    /// There are no comments for AdmDto in the schema.
+    /// </summary>
+    /// <KeyProperties>
+    /// Id
+    /// </KeyProperties>
+    [global::Microsoft.OData.Client.Key("Id")]
+    [global::Microsoft.OData.Client.OriginalNameAttribute("AdmDto")]
+    public partial class AdmDto : global::System.ComponentModel.INotifyPropertyChanged
+    {
+        /// <summary>
+        /// Create a new AdmDto object.
+        /// </summary>
+        /// <param name="ID">Initial value of Id.</param>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        public static AdmDto CreateAdmDto(int ID)
+        {
+            AdmDto admDto = new AdmDto();
+            admDto.Id = ID;
+            return admDto;
+        }
+        /// <summary>
+        /// There are no comments for Property Id in the schema.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        [global::Microsoft.OData.Client.OriginalNameAttribute("Id")]
+        public int Id
+        {
+            get
+            {
+                return this._Id;
+            }
+            set
+            {
+                this.OnIdChanging(value);
+                this._Id = value;
+                this.OnIdChanged();
+                this.OnPropertyChanged("Id");
+            }
+        }
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        private int _Id;
+        partial void OnIdChanging(int value);
+        partial void OnIdChanged();
+        /// <summary>
+        /// There are no comments for Property Name in the schema.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        [global::Microsoft.OData.Client.OriginalNameAttribute("Name")]
+        public string Name
+        {
+            get
+            {
+                return this._Name;
+            }
+            set
+            {
+                this.OnNameChanging(value);
+                this._Name = value;
+                this.OnNameChanged();
+                this.OnPropertyChanged("Name");
+            }
+        }
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        private string _Name;
+        partial void OnNameChanging(string value);
+        partial void OnNameChanged();
+        /// <summary>
+        /// There are no comments for Property AcceptDate in the schema.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        [global::Microsoft.OData.Client.OriginalNameAttribute("AcceptDate")]
+        public global::System.Nullable<global::System.DateTimeOffset> AcceptDate
+        {
+            get
+            {
+                return this._AcceptDate;
+            }
+            set
+            {
+                this.OnAcceptDateChanging(value);
+                this._AcceptDate = value;
+                this.OnAcceptDateChanged();
+                this.OnPropertyChanged("AcceptDate");
+            }
+        }
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        private global::System.Nullable<global::System.DateTimeOffset> _AcceptDate;
+        partial void OnAcceptDateChanging(global::System.Nullable<global::System.DateTimeOffset> value);
+        partial void OnAcceptDateChanged();
+        /// <summary>
+        /// This event is raised when the value of the property is changed
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        public event global::System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+        /// <summary>
+        /// The value of the property is changed
+        /// </summary>
+        /// <param name="property">property name</param>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        protected virtual void OnPropertyChanged(string property)
+        {
+            if ((this.PropertyChanged != null))
+            {
+                this.PropertyChanged(this, new global::System.ComponentModel.PropertyChangedEventArgs(property));
+            }
+        }
+    }
+    /// <summary>
     /// Class containing all extension methods
     /// </summary>
     public static class ExtensionMethods
@@ -1100,9 +1220,18 @@ namespace WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel
         {
             return new global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.SkillLevelSingle(source.Context, source.GetKeyPath(global::Microsoft.OData.Client.Serializer.GetKeyString(source.Context, keys)));
         }
+        /// <summary>
+        /// Get an entity of type global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDto as global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDtoSingle specified by key from an entity set
+        /// </summary>
+        /// <param name="source">source entity set</param>
+        /// <param name="keys">dictionary with the names and values of keys</param>
+        public static global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDtoSingle ByKey(this global::Microsoft.OData.Client.DataServiceQuery<global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDto> source, global::System.Collections.Generic.Dictionary<string, object> keys)
+        {
+            return new global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDtoSingle(source.Context, source.GetKeyPath(global::Microsoft.OData.Client.Serializer.GetKeyString(source.Context, keys)));
+        }
     }
 }
-namespace WebAPIODataV4.Client.Default
+namespace WebAPIODataV4.Client.Damienbod
 {
     /// <summary>
     /// There are no comments for SqliteContext in the schema.
@@ -1137,7 +1266,7 @@ namespace WebAPIODataV4.Client.Default
             {
                 return resolvedType;
             }
-            resolvedType = this.DefaultResolveType(typeName, "Default", "WebAPIODataV4.Client.Default");
+            resolvedType = this.DefaultResolveType(typeName, "damienbod", "WebAPIODataV4.Client.Damienbod");
             if ((resolvedType != null))
             {
                 return resolvedType;
@@ -1161,13 +1290,13 @@ namespace WebAPIODataV4.Client.Default
                 }
                 return string.Concat("WebAPIODataV4SQLite.DomainModel.", clientType.Name);
             }
-            if (clientType.Namespace.Equals("WebAPIODataV4.Client.Default", global::System.StringComparison.Ordinal))
+            if (clientType.Namespace.Equals("WebAPIODataV4.Client.Damienbod", global::System.StringComparison.Ordinal))
             {
                 if (originalNameAttribute != null)
                 {
-                    return string.Concat("Default.", originalNameAttribute.OriginalName);
+                    return string.Concat("damienbod.", originalNameAttribute.OriginalName);
                 }
-                return string.Concat("Default.", clientType.Name);
+                return string.Concat("damienbod.", clientType.Name);
             }
             return null;
         }
@@ -1223,6 +1352,23 @@ namespace WebAPIODataV4.Client.Default
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
         private global::Microsoft.OData.Client.DataServiceQuery<global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.Player> _Player;
         /// <summary>
+        /// There are no comments for Adms in the schema.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        public global::Microsoft.OData.Client.DataServiceQuery<global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDto> Adms
+        {
+            get
+            {
+                if ((this._Adms == null))
+                {
+                    this._Adms = base.CreateQuery<global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDto>("Adms");
+                }
+                return this._Adms;
+            }
+        }
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        private global::Microsoft.OData.Client.DataServiceQuery<global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDto> _Adms;
+        /// <summary>
         /// There are no comments for AnimalType in the schema.
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
@@ -1245,6 +1391,14 @@ namespace WebAPIODataV4.Client.Default
         public void AddToPlayer(global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.Player player)
         {
             base.AddObject("Player", player);
+        }
+        /// <summary>
+        /// There are no comments for Adms in the schema.
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.OData.Client.Design.T4", "2.0.0")]
+        public void AddToAdms(global::WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel.AdmDto admDto)
+        {
+            base.AddObject("Adms", admDto);
         }
         /// <summary>
         /// There are no comments for SkillLevels in the schema.
@@ -1286,10 +1440,10 @@ namespace WebAPIODataV4.Client.Default
           <PropertyRef Name=""EventDataId"" />
         </Key>
         <Property Name=""EventDataId"" Type=""Edm.Int64"" Nullable=""false"" />
-        <Property Name=""Factor"" Type=""Edm.Int32"" Nullable=""false"" />
+        <Property Name=""Factor"" Type=""Edm.Int32"" />
         <Property Name=""StringTestId"" Type=""Edm.String"" />
-        <Property Name=""FixChange"" Type=""Edm.Double"" Nullable=""false"" />
-        <Property Name=""AnimalTypeId"" Type=""Edm.Int64"" Nullable=""false"" />
+        <Property Name=""FixChange"" Type=""Edm.Double"" />
+        <Property Name=""AnimalTypeId"" Type=""Edm.Int64"" />
         <NavigationProperty Name=""AnimalType"" Type=""WebAPIODataV4SQLite.DomainModel.AnimalType"" />
       </EntityType>
       <EntityType Name=""Player"">
@@ -1326,8 +1480,16 @@ namespace WebAPIODataV4.Client.Default
         <Property Name=""Description"" Type=""Edm.String"" />
         <NavigationProperty Name=""PlayerStats"" Type=""WebAPIODataV4SQLite.DomainModel.PlayerStats"" ContainsTarget=""true"" />
       </EntityType>
+      <EntityType Name=""AdmDto"">
+        <Key>
+          <PropertyRef Name=""Id"" />
+        </Key>
+        <Property Name=""Id"" Type=""Edm.Int32"" Nullable=""false"" />
+        <Property Name=""Name"" Type=""Edm.String"" />
+        <Property Name=""AcceptDate"" Type=""Edm.DateTimeOffset"" />
+      </EntityType>
     </Schema>
-    <Schema Namespace=""Default"" xmlns=""http://docs.oasis-open.org/odata/ns/edm"">
+    <Schema Namespace=""damienbod"" xmlns=""http://docs.oasis-open.org/odata/ns/edm"">
       <EntityContainer Name=""SqliteContext"">
         <EntitySet Name=""AnimalType"" EntityType=""WebAPIODataV4SQLite.DomainModel.AnimalType"">
           <NavigationPropertyBinding Path=""EventData"" Target=""EventData"" />
@@ -1336,6 +1498,7 @@ namespace WebAPIODataV4.Client.Default
           <NavigationPropertyBinding Path=""AnimalType"" Target=""AnimalType"" />
         </EntitySet>
         <EntitySet Name=""Player"" EntityType=""WebAPIODataV4SQLite.DomainModel.Player"" />
+        <EntitySet Name=""Adms"" EntityType=""WebAPIODataV4SQLite.DomainModel.AdmDto"" />
         <Singleton Name=""SkillLevels"" Type=""WebAPIODataV4SQLite.DomainModel.SkillLevels"" />
       </EntityContainer>
     </Schema>

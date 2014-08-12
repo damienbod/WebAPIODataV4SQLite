@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Microsoft.OData.Client;
-using WebAPIODataV4.Client.Default;
+using WebAPIODataV4.Client.Damienbod;
 using WebAPIODataV4.Client.WebAPIODataV4SQLite.DomainModel;
 
 namespace WebAPIODataV4.Client
@@ -10,8 +10,7 @@ namespace WebAPIODataV4.Client
     {
         static void Main(string[] args)
         {
-			// ipv4.fiddler:59145/odata/Adms%288%29
-			var context = new SqliteContext(new Uri("http://localhost.fiddler:59145/odata/"));
+			var context = new SqliteContext(new Uri("http://localhost.fiddler:59145/odata"));
             context.Format.UseJson();
 
 			// Call some basic Get
@@ -36,11 +35,11 @@ namespace WebAPIODataV4.Client
             dataToUpdate.FixChange = 97;
 
 			context.AddToEventData(newObjectEventData);
-			context.UpdateObject(dataToUpdate);
+			//context.UpdateObject(dataToUpdate);
 			context.AddAndUpdateResponsePreference = DataServiceResponsePreference.IncludeContent;
 
 			// Add the data to the server
-			DataServiceResponse response = context.SaveChanges(SaveChangesOptions.BatchWithSingleChangeset);
+			DataServiceResponse response = context.SaveChanges(SaveChangesOptions.None);
 
             foreach (OperationResponse individualResponse in response)
             {
