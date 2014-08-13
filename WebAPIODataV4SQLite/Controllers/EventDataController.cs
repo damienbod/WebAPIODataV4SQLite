@@ -77,7 +77,7 @@ namespace WebAPIODataV4SQLite.Controllers
             return Updated(eventData);
         }
 
-        [HttpPut]
+        [HttpPatch]
         [ODataRoute("")]
         public async Task<IHttpActionResult> Patch([FromODataUri] int key, Delta<EventData> delta)
         {

@@ -16,6 +16,7 @@ namespace WebAPIODataV4SQLite
 			listener.EnableEvents(WebApiTracing.Log, EventLevel.LogAlways, Keywords.All);
 			listener.LogToConsole();
 
+			// This is required because the OData batchHandler does not work when hosted in a OWIN container
 			GlobalConfiguration.Configure(WebApiConfig.Register);
 
 			AreaRegistration.RegisterAllAreas();
