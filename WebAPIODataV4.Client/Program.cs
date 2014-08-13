@@ -10,7 +10,7 @@ namespace WebAPIODataV4.Client
     {
         static void Main(string[] args)
         {
-			var context = new SqliteContext(new Uri("http://localhost.fiddler:59145/odata"));
+			var context = new SqliteContext(new Uri("http://localhost:59145/odata/"));
             context.Format.UseJson();
 
 			// Call some basic Get
@@ -39,7 +39,7 @@ namespace WebAPIODataV4.Client
 			context.AddAndUpdateResponsePreference = DataServiceResponsePreference.IncludeContent;
 
 			// Add the data to the server
-			DataServiceResponse response = context.SaveChanges(SaveChangesOptions.None);
+			DataServiceResponse response = context.SaveChanges(SaveChangesOptions.BatchWithSingleChangeset);
 
             foreach (OperationResponse individualResponse in response)
             {
