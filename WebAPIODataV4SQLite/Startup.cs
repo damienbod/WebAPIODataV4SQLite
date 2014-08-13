@@ -9,7 +9,8 @@ namespace WebAPIODataV4SQLite
     {
         public void Configuration(IAppBuilder app)
         {
-            app.UseWebApi(WebApiConfig.Register());
+			// Using the old web server hosting because the OData batch routing does not work inside OWIN at present.
+            //app.UseWebApi(WebApiConfig.Register());
         }
     }
 }

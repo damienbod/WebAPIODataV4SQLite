@@ -6,7 +6,6 @@ using System.Web.Http.Tracing;
 using System.Web.OData.Batch;
 using System.Web.OData.Builder;
 using System.Web.OData.Extensions;
-using System.Web.OData.Routing;
 using CacheCow.Server;
 using Microsoft.OData.Edm;
 using Microsoft.Practices.Unity.WebApi;
@@ -18,22 +17,21 @@ namespace WebAPIODataV4SQLite
 {
     public static class WebApiConfig
     {
-        public static HttpConfiguration Register()
-        {
-            var config = new HttpConfiguration();
+		public static void Register(HttpConfiguration config)
+		{
 			config.EnableSystemDiagnosticsTracing();
 			config.Services.Replace(typeof(ITraceWriter), new SlabTraceWriter());
 			config.Services.Add(typeof(IExceptionLogger), new SlabLoggingExceptionLogger());
 
-            config.MapHttpAttributeRoutes();
+			config.MapHttpAttributeRoutes();
 			config.DependencyResolver = new UnityDependencyResolver(UnityConfig.GetConfiguredContainer());
-            RegisterFilterProviders(config);
+			RegisterFilterProviders(config);
 
-            config.Routes.MapHttpRoute(
-                name: "DefaultApi",
-                routeTemplate: "api/{controller}/{id}",
-                defaults: new { id = RouteParameter.Optional }
-            );
+			config.Routes.MapHttpRoute(
+				name: "DefaultApi",
+				routeTemplate: "api/{controller}/{id}",
+				defaults: new { id = RouteParameter.Optional }
+			);
 
 			var cacheCowCacheHandler = new CachingHandler(config);
 			config.MessageHandlers.Add(cacheCowCacheHandler);
@@ -42,21 +40,12 @@ namespace WebAPIODataV4SQLite
 			//var odataFormatters = ODataMediaTypeFormatters.Create();
 			//config.Formatters.InsertRange(0, odataFormatters);
 
-			//config.MapODataServiceRoute("odata", "odata", GetModel(), new MyODataPathHandler(), ODataRoutingConventions.CreateDefault());
-			//config.MapODataServiceRoute("odata", "odatabatch", model: GetModel());
-
 			ODataBatchHandler odataBatchHandler = new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer);
 			odataBatchHandler.MessageQuotas.MaxOperationsPerChangeset = 10;
 			odataBatchHandler.MessageQuotas.MaxPartsPerBatch = 10;
-	        odataBatchHandler.ODataRouteName = "odatabatch";
 
-			config.MapODataServiceRoute(
-				routeName:"odatabatch", 
-				routePrefix: "odata", 
-				model: GetModel(),
-				batchHandler: odataBatchHandler);
-            return config;
-        }
+			config.MapODataServiceRoute("odata", "odata", model: GetModel(), batchHandler: odataBatchHandler);
+		}
 
         public static IEdmModel GetModel()
         {
@@ -76,17 +65,6 @@ namespace WebAPIODataV4SQLite
             return builder.GetEdmModel();
         }
 
-		public class MyODataPathHandler : DefaultODataPathHandler
-		{
-			public override string Link(ODataPath path)
-			{
-				if (path.PathTemplate == "~")
-				{
-					return path.ToString() + "/";
-				}
-				return base.Link(path);
-			}
-		}
         private static void RegisterFilterProviders(HttpConfiguration config)
         {
             var providers = config.Services.GetFilterProviders().ToList();

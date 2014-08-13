@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.Tracing;
+using System.Web.Http;
 using System.Web.Mvc;
 using System.Web.Optimization;
 using System.Web.Routing;
@@ -15,10 +16,12 @@ namespace WebAPIODataV4SQLite
 			listener.EnableEvents(WebApiTracing.Log, EventLevel.LogAlways, Keywords.All);
 			listener.LogToConsole();
 
-            AreaRegistration.RegisterAllAreas();
-            FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters);
-            RouteConfig.RegisterRoutes(RouteTable.Routes);
-            BundleConfig.RegisterBundles(BundleTable.Bundles);
+			GlobalConfiguration.Configure(WebApiConfig.Register);
+
+			AreaRegistration.RegisterAllAreas();
+			FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters);
+			RouteConfig.RegisterRoutes(RouteTable.Routes);
+			BundleConfig.RegisterBundles(BundleTable.Bundles);
         }
     }
 }
