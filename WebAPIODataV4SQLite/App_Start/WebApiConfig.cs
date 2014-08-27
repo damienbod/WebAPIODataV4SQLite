@@ -40,7 +40,7 @@ namespace WebAPIODataV4SQLite
 			//var odataFormatters = ODataMediaTypeFormatters.Create();
 			//config.Formatters.InsertRange(0, odataFormatters);
 
-			ODataBatchHandler odataBatchHandler = new DefaultODataBatchHandler(GlobalConfiguration.DefaultServer);
+			ODataBatchHandler odataBatchHandler = new ODataBatchHandlerSingleTransaction(GlobalConfiguration.DefaultServer);
 			odataBatchHandler.MessageQuotas.MaxOperationsPerChangeset = 10;
 			odataBatchHandler.MessageQuotas.MaxPartsPerBatch = 10;
 

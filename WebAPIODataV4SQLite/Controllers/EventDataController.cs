@@ -1,4 +1,5 @@
-﻿using System.Data.Entity.Migrations;
+﻿using System;
+using System.Data.Entity.Migrations;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -10,7 +11,9 @@ using System.Web.Http;
 using System.Web.Http.Hosting;
 using System.Web.OData;
 using System.Web.OData.Routing;
+using Microsoft.Ajax.Utilities;
 using WebApiContrib.Tracing.Slab;
+using WebAPIODataV4SQLite.App_Start;
 using WebAPIODataV4SQLite.DomainModel;
 
 namespace WebAPIODataV4SQLite.Controllers
@@ -19,12 +22,6 @@ namespace WebAPIODataV4SQLite.Controllers
     [ODataRoutePrefix("EventData")]
     public class EventDataController : ODataController
     {
-        readonly SqliteContext _sqliteContext;
-
-        public EventDataController(SqliteContext sqliteContext)
-        {
-            _sqliteContext = sqliteContext;
-        }
 
 		[SlabLoggingFilter]
         [EnableQuery(PageSize = 20)]		
@@ -33,7 +30,7 @@ namespace WebAPIODataV4SQLite.Controllers
 			// We want to force xml for the odata feed
 			//Request.Headers.Accept.Clear();
 			//Request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
-            return Ok(_sqliteContext.EventDataEntities.AsQueryable());
+            return Ok( Request.GetContext().EventDataEntities.AsQueryable());
         }
 
         [HttpPost]
@@ -45,8 +42,8 @@ namespace WebAPIODataV4SQLite.Controllers
                 return BadRequest(ModelState);
             }
 
-            _sqliteContext.EventDataEntities.Add(eventData);
-            await _sqliteContext.SaveChangesAsync();
+			Request.GetContext().EventDataEntities.Add(eventData);
+			await Request.GetContext().SaveChangesAsync();
 
             return Created(eventData);
         }
@@ -54,7 +51,7 @@ namespace WebAPIODataV4SQLite.Controllers
         [EnableQuery(PageSize = 20)]
         public IHttpActionResult Get([FromODataUri] int key)
         {
-            return Ok(_sqliteContext.EventDataEntities.Find(key));
+			return Ok(Request.GetContext().EventDataEntities.Find(key));
         }
 
         [HttpPut]
@@ -66,13 +63,13 @@ namespace WebAPIODataV4SQLite.Controllers
                 return BadRequest(ModelState);
             }
 
-            if (!_sqliteContext.EventDataEntities.Any(t => t.EventDataId == eventData.EventDataId && t.EventDataId == key))
+			if (!Request.GetContext().EventDataEntities.Any(t => t.EventDataId == eventData.EventDataId && t.EventDataId == key))
             {
                 return Content(HttpStatusCode.NotFound, "NotFound");
             }
 
-            _sqliteContext.EventDataEntities.AddOrUpdate(eventData);
-            await _sqliteContext.SaveChangesAsync();
+			Request.GetContext().EventDataEntities.AddOrUpdate(eventData);
+			await Request.GetContext().SaveChangesAsync();
 
             return Updated(eventData);
         }
@@ -81,43 +78,43 @@ namespace WebAPIODataV4SQLite.Controllers
         [ODataRoute("")]
         public async Task<IHttpActionResult> Patch([FromODataUri] int key, Delta<EventData> delta)
         {
+	        //return BadRequest("TESTING BATCHING ROLLBACK");
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
 
-            if (!_sqliteContext.EventDataEntities.Any(t =>  t.EventDataId == key))
+			if (!Request.GetContext().EventDataEntities.Any(t => t.EventDataId == key))
             {
                 return Content(HttpStatusCode.NotFound, "NotFound");
             }
 
-            var eventData = _sqliteContext.EventDataEntities.Single(t => t.EventDataId == key);
+			var eventData = Request.GetContext().EventDataEntities.Single(t => t.EventDataId == key);
             delta.Patch(eventData);
-            await _sqliteContext.SaveChangesAsync();
+			await Request.GetContext().SaveChangesAsync();
 
             return Updated(eventData);
         }
-
 
         [HttpDelete]
         [ODataRoute("")]
         public async Task<IHttpActionResult> Delete([FromODataUri] int key)
         {
-            var entity = _sqliteContext.EventDataEntities.FirstOrDefault(t => t.EventDataId == key);
+			var entity = Request.GetContext().EventDataEntities.FirstOrDefault(t => t.EventDataId == key);
             if (entity == null)
             {
                 return Content(HttpStatusCode.NotFound, "NotFound");
             }
 
-            _sqliteContext.EventDataEntities.Remove(entity);
-            await _sqliteContext.SaveChangesAsync();
+			Request.GetContext().EventDataEntities.Remove(entity);
+			await Request.GetContext().SaveChangesAsync();
 
             return Content(HttpStatusCode.NoContent, "Deleted");
         }
 
         protected override void Dispose(bool disposing)
         {
-            _sqliteContext.Dispose();
+			Request.GetContext().Dispose();
             base.Dispose(disposing);
         }
     }

@@ -23,19 +23,29 @@ namespace WebAPIODataV4.Client
             var newObjectEventData = new EventData
             {
                 AnimalTypeId = animalsItems.First().Key,
-                Factor = 56,
-                FixChange = 13.0,
-                StringTestId = "testdatafromodataclient",
+                Factor = 55,
+                FixChange = 55.0,
+                StringTestId = "_ok_testdatafromodataclient",
                 AnimalType = animalsItems.First()
             };
 
+			var secondNewObjectEventData = new EventData
+			{
+				AnimalTypeId = 200,
+				Factor = 44,
+				FixChange = 44.0,
+				StringTestId = "_nok_testdatafromodataclient",
+			};
+
 			// Update a new entity
             var dataToUpdate = eventDataItems.FirstOrDefault();
-            dataToUpdate.Factor = 99;
+            dataToUpdate.Factor = -1;
             dataToUpdate.FixChange = 97;
 
 			context.AddToEventData(newObjectEventData);
 			context.UpdateObject(dataToUpdate);
+			context.AddToEventData(secondNewObjectEventData);
+
 			context.AddAndUpdateResponsePreference = DataServiceResponsePreference.IncludeContent;
 
 			// Add the data to the server
